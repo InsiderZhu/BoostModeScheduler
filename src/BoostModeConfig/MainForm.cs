@@ -441,6 +441,7 @@ public class MainForm : Form
         try
         {
             _service ??= new ServiceController("BoostModeSvc");
+            _service.Refresh();
             var status = _service.Status;
             lblServiceStatus.Text = $"状态: {(status == ServiceControllerStatus.Running ? "● 运行中" : "○ 已停止")}";
             lblServiceStatus.ForeColor = status == ServiceControllerStatus.Running ? Color.Green : Color.Red;
