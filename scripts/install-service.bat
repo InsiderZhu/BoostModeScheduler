@@ -1,124 +1,130 @@
 @echo off
-chcp 936 >nul 2>&1
-title BoostModeScheduler - 服务管理
+setlocal enabledelayedexpansion
+title BoostModeScheduler - Service Manager
 
+:: Auto-elevate to admin
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo 正在请求管理员权限...
+    echo Requesting admin privileges...
+    timeout /t 1 >nul
     powershell -Command "Start-Process '%~f0' -Verb RunAs"
     exit /b
 )
 
-set "SERVICE_NAME=BoostModeSvc"
-set "CONFIG_DIR=%ProgramData%\BoostModeSvc"
-
+:: Locate service exe (same dir first, then dev structure)
 if exist "%~dp0BoostModeService.exe" (
-    set "SERVICE_EXE=%~dp0BoostModeService.exe"
+    set "SVC_EXE=%~dp0BoostModeService.exe"
+    set "BASE_DIR=%~dp0"
 ) else if exist "%~dp0..\publish\service\BoostModeService.exe" (
-    set "SERVICE_EXE=%~dp0..\publish\service\BoostModeService.exe"
+    set "SVC_EXE=%~dp0..\publish\service\BoostModeService.exe"
+    set "BASE_DIR=%~dp0.."
 ) else (
-    echo [错误] 未找到 BoostModeService.exe
-    echo 请确认该文件与 install-service.bat 在同一目录
+    echo [ERROR] BoostModeService.exe not found
+    echo Please make sure the exe file is in the same folder as this script
     pause
     exit /b 1
 )
 
+:: Locate config.json
 if exist "%~dp0config.json" (
-    set "CONFIG_SRC=%~dp0config.json"
+    set "CFG_SRC=%~dp0config.json"
 ) else if exist "%~dp0..\config.json" (
-    set "CONFIG_SRC=%~dp0..\config.json"
+    set "CFG_SRC=%~dp0..\config.json"
 )
 
+set "SVC_NAME=BoostModeSvc"
+set "CFG_DIR=%ProgramData%\BoostModeSvc"
+
 echo ============================================
-echo   BoostModeScheduler - 服务管理
+echo   BoostModeScheduler - Service Manager
 echo ============================================
 echo.
-echo 请选择操作:
-echo   1. 安装并启动服务
-echo   2. 停止并卸载服务
-echo   3. 重启服务
-echo   4. 查看服务状态
+echo Select action:
+echo   1. Install and start service
+echo   2. Stop and uninstall service
+echo   3. Restart service
+echo   4. View service status
 echo.
-set /p CHOICE="请输入选项 (1-4): "
+set /p CHOICE="Enter choice (1-4): "
 
 if "%CHOICE%"=="1" goto INSTALL
 if "%CHOICE%"=="2" goto UNINSTALL
 if "%CHOICE%"=="3" goto RESTART
 if "%CHOICE%"=="4" goto STATUS
-echo 无效选项
+echo Invalid choice
 pause
 exit /b 1
 
 :INSTALL
-echo [1/4] 创建配置目录...
-mkdir "%CONFIG_DIR%" 2>nul
+echo [1/4] Creating config directory...
+mkdir "%CFG_DIR%" 2>nul
 
-echo [2/4] 复制默认配置...
-if defined CONFIG_SRC (
-    copy /y "%CONFIG_SRC%" "%CONFIG_DIR%\config.json" >nul 2>&1
+echo [2/4] Copying default config...
+if defined CFG_SRC (
+    copy /y "%CFG_SRC%" "%CFG_DIR%\config.json" >nul 2>&1
 ) else (
-    echo   - 跳过(未找到 config.json)
+    echo   - Skipped (config.json not found)
 )
 
-echo [3/4] 安装服务...
-sc create %SERVICE_NAME% binPath="\"%SERVICE_EXE%\"" start=auto >nul 2>&1
+echo [3/4] Installing service...
+sc create %SVC_NAME% binPath="\"%SVC_EXE%\"" start=auto >nul 2>&1
 if %errorlevel% equ 0 (
-    echo   - 服务已创建
+    echo   - Service created
 ) else (
-    sc config %SERVICE_NAME% binPath="\"%SERVICE_EXE%\"" start=auto >nul
-    echo   - 服务已更新
+    sc config %SVC_NAME% binPath="\"%SVC_EXE%\"" start=auto >nul 2>&1
+    echo   - Service updated
 )
 
-echo [4/4] 启动服务...
-sc start %SERVICE_NAME% >nul 2>&1
+echo [4/4] Starting service...
+sc start %SVC_NAME% >nul 2>&1
 if %errorlevel% equ 0 (
-    echo   - 服务已启动
+    echo   - Service started
 ) else (
-    echo   - 服务已在运行中
+    echo   - Service already running
 )
 
 echo.
-echo 安装完成!
+echo Install complete!
 echo.
-echo 配置工具: "%~dp0BoostModeConfig.exe"
+echo Config tool: "%BASE_DIR%BoostModeConfig.exe"
 pause
 exit /b 0
 
 :UNINSTALL
-echo [1/2] 停止服务...
-sc stop %SERVICE_NAME% >nul 2>&1
+echo [1/2] Stopping service...
+sc stop %SVC_NAME% >nul 2>&1
 
-echo [2/2] 卸载服务...
-sc delete %SERVICE_NAME% >nul 2>&1
+echo [2/2] Uninstalling service...
+sc delete %SVC_NAME% >nul 2>&1
 if %errorlevel% neq 0 (
-    echo   - 卸载失败(服务可能不存在)
+    echo   - Uninstall failed (service may not exist)
 ) else (
-    echo   - 服务已卸载
-    echo [提示] 配置文件保留在: %CONFIG_DIR%
+    echo   - Service uninstalled
+    echo [NOTE] Config files kept at: %CFG_DIR%
 )
 echo.
 pause
 exit /b 0
 
 :RESTART
-echo [1/2] 停止服务...
-sc stop %SERVICE_NAME% >nul 2>&1
+echo [1/2] Stopping service...
+sc stop %SVC_NAME% >nul 2>&1
 timeout /t 3 >nul
 
-echo [2/2] 启动服务...
-sc start %SERVICE_NAME% >nul 2>&1
+echo [2/2] Starting service...
+sc start %SVC_NAME% >nul 2>&1
 if %errorlevel% equ 0 (
-    echo   - 服务已重启
+    echo   - Service restarted
 ) else (
-    echo   - 重启失败,请检查服务状态
+    echo   - Restart failed, check service status
 )
 echo.
 pause
 exit /b 0
 
 :STATUS
-sc query %SERVICE_NAME%
+sc query %SVC_NAME%
 echo.
-echo 日志目录: %CONFIG_DIR%\logs\
+echo Log directory: %CFG_DIR%\logs\
 pause
 exit /b 0
