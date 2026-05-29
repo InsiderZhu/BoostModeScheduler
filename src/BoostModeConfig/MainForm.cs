@@ -190,15 +190,15 @@ public class MainForm : Form
         // ─── Manual Override ───
         grpOverride = new GroupBox { Text = "手动切换模式 (AC=电源, DC=电池)", Top = y, Height = 56 };
 
-        cmbManualAc = CreateModeCombo(_config.LoadModeValueAc, 130);
-        cmbManualAc.Width = 150;
+        new Label { Text = "AC:", Width = 25, Height = 20, TextAlign = ContentAlignment.MiddleRight }.Let(l => grpOverride.Controls.Add(l));
+        cmbManualAc = CreateModeCombo(_config.LoadModeValueAc, 120);
         grpOverride.Controls.Add(cmbManualAc);
 
-        cmbManualDc = CreateModeCombo(_config.LoadModeValueDc, 130);
-        cmbManualDc.Width = 150;
+        new Label { Text = "DC:", Width = 25, Height = 20, TextAlign = ContentAlignment.MiddleRight }.Let(l => grpOverride.Controls.Add(l));
+        cmbManualDc = CreateModeCombo(_config.LoadModeValueDc, 120);
         grpOverride.Controls.Add(cmbManualDc);
 
-        btnApplyManual = new Button { Text = "立即切换", Top = 18, Width = 130, Height = 28 };
+        btnApplyManual = new Button { Text = "立即切换", Width = 120, Height = 28 };
         btnApplyManual.BackColor = Color.LightCoral;
         btnApplyManual.Click += (_, _) => ForceManualMode();
         grpOverride.Controls.Add(btnApplyManual);
@@ -329,27 +329,36 @@ public class MainForm : Form
 
         // ── Manual override ──
         int overrideWidth = grpOverride.ClientSize.Width;
-        new Action(() =>
-        {
-            int labelW = 25;
-            int comboW2 = Math.Max(100, (overrideWidth - 180) / 3);
-            if (comboW2 > 160) comboW2 = 160;
+        int labelW = 25;
+        int comboW2 = Math.Max(100, (overrideWidth - 200) / 3);
+        if (comboW2 > 160) comboW2 = 160;
+        int cx = 10;
+        int topY = 18;
 
-            int cx = 12;
-            foreach (Control c in grpOverride.Controls)
+        foreach (Control c in grpOverride.Controls)
+        {
+            if (c is Label lbl && lbl.Text == "AC:")
             {
-                if (c is Label lbl && lbl.Text == "AC:")
-                { c.Left = cx; c.Width = labelW; cx += labelW + 2; }
-                else if (c == cmbManualAc)
-                { c.Left = cx; c.Width = comboW2; cx += comboW2 + 12; }
-                else if (c is Label lbl2 && lbl2.Text == "DC:")
-                { c.Left = cx; c.Width = labelW; cx += labelW + 2; }
-                else if (c == cmbManualDc)
-                { c.Left = cx; c.Width = comboW2; cx += comboW2 + 12; }
-                else if (c == btnApplyManual)
-                { c.Left = Math.Max(cx, overrideWidth - 150); }
+                lbl.Left = cx; lbl.Width = labelW; lbl.Top = topY; cx += labelW + 2;
             }
-        })();
+            else if (c == cmbManualAc)
+            {
+                cmbManualAc.Left = cx; cmbManualAc.Width = comboW2; cmbManualAc.Top = topY - 2; cx += comboW2 + 6;
+            }
+            else if (c is Label lbl2 && lbl2.Text == "DC:")
+            {
+                lbl2.Left = cx; lbl2.Width = labelW; lbl2.Top = topY; cx += labelW + 2;
+            }
+            else if (c == cmbManualDc)
+            {
+                cmbManualDc.Left = cx; cmbManualDc.Width = comboW2; cmbManualDc.Top = topY - 2; cx += comboW2 + 6;
+            }
+            else if (c == btnApplyManual)
+            {
+                btnApplyManual.Left = Math.Max(cx + 6, overrideWidth - 136);
+                btnApplyManual.Top = topY - 2;
+            }
+        }
 
         // ── Bottom buttons ──
         btnEditConfig.Left = x;
