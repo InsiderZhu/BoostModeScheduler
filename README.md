@@ -88,7 +88,7 @@ BoostModeScheduler
 
 ### 1. Download / 下载发布版
 
-从 [Releases](https://github.com/anomalyco/BoostModeScheduler/releases) 下载最新版，或自行编译（见下方）。
+从 [Releases](https://github.com/InsiderZhu/BoostModeScheduler/releases) 下载最新版，或自行编译（见下方）。
 
 ### 2. Install Service / 安装服务
 
