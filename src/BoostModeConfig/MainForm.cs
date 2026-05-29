@@ -209,7 +209,7 @@ public class MainForm : Form
         // ─── Log ───
         grpLog = new GroupBox { Text = "日志管理", Top = y, Height = 56 };
 
-        btnOpenLogFolder = new Button { Text = "打开日志文件夹", Left = 12, Top = 18, Width = 150, Height = 28 };
+        btnOpenLogFolder = new Button { Text = "打开日志文件夹", Left = 12, Top = 18, Width = 120, Height = 28 };
         btnOpenLogFolder.Click += (_, _) =>
         {
             try { Process.Start("explorer.exe", ConfigManager.GetLogDir()); }
@@ -217,7 +217,11 @@ public class MainForm : Form
         };
         grpLog.Controls.Add(btnOpenLogFolder);
 
-        btnViewLog = new Button { Text = "查看最近日志", Left = 172, Top = 18, Width = 150, Height = 28 };
+        var btnMiniLog = new Button { Text = "切换记录", Left = 140, Top = 18, Width = 120, Height = 28 };
+        btnMiniLog.Click += (_, _) => ShowMiniLogViewer();
+        grpLog.Controls.Add(btnMiniLog);
+
+        btnViewLog = new Button { Text = "查看完整日志", Left = 268, Top = 18, Width = 150, Height = 28 };
         btnViewLog.Click += (_, _) => ShowLogViewer();
         grpLog.Controls.Add(btnViewLog);
 
@@ -600,6 +604,115 @@ public class MainForm : Form
             Font = new Font("Consolas", 10),
             Dock = DockStyle.Fill,
             Text = logContent.ToString()
+        };
+        viewer.Controls.Add(textBox);
+
+        var closeBtn = new Button
+        {
+            Text = "关闭",
+            Dock = DockStyle.Bottom,
+            Height = 36
+        };
+        closeBtn.Click += (_, _) => viewer.Close();
+        viewer.Controls.Add(closeBtn);
+
+        viewer.ShowDialog();
+    }
+
+    private void ShowMiniLogViewer()
+    {
+        var logDir = ConfigManager.GetLogDir();
+        if (!Directory.Exists(logDir))
+        {
+            ShowError("日志目录不存在，服务可能尚未写日志");
+            return;
+        }
+
+        var logFiles = Directory.GetFiles(logDir, "*.log").OrderByDescending(f => f).Take(5).ToArray();
+        if (logFiles.Length == 0)
+        {
+            ShowError("没有找到日志文件");
+            return;
+        }
+
+        var lines = new List<string>();
+        foreach (var file in logFiles)
+        {
+            try { lines.AddRange(File.ReadAllLines(file)); }
+            catch { }
+        }
+
+        // Parse switch entries
+        var modeNames = _modeNames;
+        var entries = new List<string>();
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            if (!line.Contains("SWITCH:")) continue;
+
+            // Parse timestamp
+            var tsMatch = System.Text.RegularExpressions.Regex.Match(line, @"(\d{2}:\d{2}:\d{2})");
+            string ts = tsMatch.Success ? tsMatch.Groups[1].Value : "";
+
+            // Parse mode and values
+            var swMatch = System.Text.RegularExpressions.Regex.Match(line, @"-> (\w+) \(AC=(\d+), DC=(\d+)\)");
+            if (!swMatch.Success) continue;
+            string mode = swMatch.Groups[1].Value;
+            int acVal = int.Parse(swMatch.Groups[2].Value);
+            int dcVal = int.Parse(swMatch.Groups[3].Value);
+
+            string acName = modeNames.GetValueOrDefault(acVal, acVal.ToString());
+            string dcName = modeNames.GetValueOrDefault(dcVal, dcVal.ToString());
+            string modeLabel = mode == "LOAD" ? "负载模式" : "空闲模式";
+
+            // Look ahead for Reason line
+            string reason = "";
+            if (i + 1 < lines.Count)
+            {
+                var rMatch = System.Text.RegularExpressions.Regex.Match(lines[i + 1], @"Reason: (.+)");
+                if (rMatch.Success)
+                    reason = rMatch.Groups[1].Value;
+            }
+
+            // Look ahead for Result line
+            string result = "";
+            if (i + 2 < lines.Count)
+            {
+                var rMatch2 = System.Text.RegularExpressions.Regex.Match(lines[i + 2], @"Result: (.+)");
+                if (rMatch2.Success)
+                    result = rMatch2.Groups[1].Value;
+            }
+
+            string entry = $"[{ts}] → {modeLabel} (AC={acName}, DC={dcName})";
+            if (!string.IsNullOrEmpty(reason))
+                entry += $"  原因: {reason}";
+            if (!string.IsNullOrEmpty(result))
+                entry += $"  [{result}]";
+            entries.Add(entry);
+        }
+
+        entries.Reverse();
+
+        var viewer = new Form
+        {
+            Text = "切换记录",
+            Size = new Size(700, 350),
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false
+        };
+
+        var textBox = new TextBox
+        {
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical,
+            WordWrap = true,
+            Font = new Font("Microsoft YaHei", 10),
+            Dock = DockStyle.Fill,
+            Text = entries.Count > 0
+                ? string.Join(Environment.NewLine, entries)
+                : "暂无切换记录"
         };
         viewer.Controls.Add(textBox);
 
