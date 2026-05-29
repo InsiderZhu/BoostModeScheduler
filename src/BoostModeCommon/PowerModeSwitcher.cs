@@ -146,6 +146,53 @@ public partial class PowerModeSwitcher
         return $"FAIL({p.ExitCode}): {err}";
     }
 
+    public Dictionary<int, string> ReadModeNames()
+    {
+        var result = new Dictionary<int, string>();
+        var scheme = GetActiveSchemeGuid();
+        if (string.IsNullOrEmpty(scheme)) return result;
+
+        try
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            var psi = new ProcessStartInfo("powercfg", $"/Q {scheme} {SubProcessorGuid} {SettingGuid}")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.GetEncoding(936)
+            };
+            using var p = Process.Start(psi)!;
+            var output = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(3000);
+
+            var lines = output.Split('\n', '\r')
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0)
+                .ToArray();
+
+            for (int i = 0; i < lines.Length - 1; i++)
+            {
+                var valMatch = Regex.Match(lines[i], @":\s*(\d{3})\s*$");
+                if (!valMatch.Success) continue;
+
+                var nameMatch = Regex.Match(lines[i + 1], @":\s*(.+)\s*$");
+                if (!nameMatch.Success) continue;
+
+                int val = int.Parse(valMatch.Groups[1].Value);
+                if (val >= 0 && val <= 6)
+                    result[val] = nameMatch.Groups[1].Value.Trim();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Failed to read mode names: {ex.Message}");
+        }
+
+        return result;
+    }
+
     [GeneratedRegex(@"GUID:\s*([a-fA-F0-9\-]{36})")]
     private static partial Regex SchemeGuidRegex();
 }

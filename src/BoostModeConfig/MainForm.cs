@@ -10,6 +10,7 @@ public class MainForm : Form
     private AppConfig _config;
     private readonly System.Windows.Forms.Timer _refreshTimer;
     private ServiceController? _service;
+    private Dictionary<int, string> _modeNames;
 
     private GroupBox grpService = null!, grpStatus = null!, grpSettings = null!;
     private GroupBox grpWhitelist = null!, grpOverride = null!, grpLog = null!;
@@ -27,12 +28,6 @@ public class MainForm : Form
     private Button btnSave = null!, btnRefresh = null!;
     private Button btnEditConfig = null!, btnOpenLogFolder = null!, btnViewLog = null!;
 
-    private static readonly Dictionary<int, string> ModeNames = new()
-    {
-        { 0, "已禁用" }, { 1, "已启用" }, { 2, "积极" },
-        { 3, "高效" }, { 4, "积极高效" }, { 5, "高性能优先" }, { 6, "高效高性能优先" }
-    };
-
     public MainForm()
     {
         Text = "BoostModeScheduler - 配置工具";
@@ -42,6 +37,8 @@ public class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
 
         _config = ConfigManager.Load();
+        _modeNames = LoadModeNames();
+
         BuildUI();
 
         _refreshTimer = new System.Windows.Forms.Timer { Interval = 2000 };
@@ -49,6 +46,26 @@ public class MainForm : Form
         _refreshTimer.Start();
 
         RefreshStatus();
+    }
+
+    private Dictionary<int, string> LoadModeNames()
+    {
+        var fallback = new Dictionary<int, string>
+        {
+            { 0, "Disabled" }, { 1, "Enabled" }, { 2, "Aggressive" },
+            { 3, "Efficient" }, { 4, "Aggressive Efficient" },
+            { 5, "Performance Preferred" }, { 6, "Efficient Performance Preferred" }
+        };
+
+        try
+        {
+            var switcher = new PowerModeSwitcher();
+            var names = switcher.ReadModeNames();
+            if (names.Count > 0) return names;
+        }
+        catch { }
+
+        return fallback;
     }
 
     private void BuildUI()
@@ -176,10 +193,10 @@ public class MainForm : Form
         });
 
         cmbManualMode = CreateModeCombo(88, 20, _config.LoadModeValue);
-        cmbManualMode.Width = 160;
+        cmbManualMode.Width = 200;
         grpOverride.Controls.Add(cmbManualMode);
 
-        btnApplyManual = new Button { Text = "立即切换到所选模式", Left = 260, Top = 18, Width = 170, Height = 28 };
+        btnApplyManual = new Button { Text = "立即切换到所选模式", Left = 300, Top = 18, Width = 170, Height = 28 };
         btnApplyManual.BackColor = Color.LightCoral;
         btnApplyManual.Click += (_, _) => ForceManualMode();
         grpOverride.Controls.Add(btnApplyManual);
@@ -228,8 +245,14 @@ public class MainForm : Form
 
     private ComboBox CreateModeCombo(int x, int y, int selected)
     {
-        var cmb = new ComboBox { Left = x, Top = y, Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
-        cmb.Items.AddRange(ModeNames.Select(kv => (object)new KeyValuePair<int, string>(kv.Key, $"{kv.Key} - {kv.Value}")).ToArray());
+        var cmb = new ComboBox { Left = x, Top = y, Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
+
+        var items = _modeNames
+            .OrderBy(kv => kv.Key)
+            .Select(kv => (object)new KeyValuePair<int, string>(kv.Key, $"{kv.Key} - {kv.Value}"))
+            .ToArray();
+
+        cmb.Items.AddRange(items);
         cmb.DisplayMember = "Value";
         cmb.ValueMember = "Key";
 
@@ -279,7 +302,8 @@ public class MainForm : Form
             var statusInfo = ConfigManager.LoadStatus();
             if (statusInfo != null)
             {
-                lblCurrentMode.Text = $"当前模式: {statusInfo.CurrentMode} (值={statusInfo.CurrentModeValue})";
+                var modeName = _modeNames.GetValueOrDefault(statusInfo.CurrentModeValue, $"?({statusInfo.CurrentModeValue})");
+                lblCurrentMode.Text = $"当前模式: {statusInfo.CurrentMode} ({modeName})";
                 lblCpuUsage.Text = $"CPU 占用: {statusInfo.CpuUsage:F1}%";
                 lblGameProcesses.Text = $"检测到游戏进程: {(statusInfo.GameProcesses.Count > 0 ? string.Join(", ", statusInfo.GameProcesses) : "无")}";
                 lblLastSwitch.Text = $"上次切换原因: {statusInfo.LastSwitchReason ?? "--"}";
@@ -371,7 +395,7 @@ public class MainForm : Form
 
         var kv = (KeyValuePair<int, string>)cmbManualMode.SelectedItem;
         int modeValue = kv.Key;
-        string modeName = $"{kv.Key} - {kv.Value}";
+        string modeName = kv.Value;
 
         try
         {
@@ -380,7 +404,7 @@ public class MainForm : Form
             {
                 MessageBox.Show($"已强制切换到 [{modeName}]\n\n结果: {output}",
                     "手动切换", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                Logger.Info($"Manual override: switched to value={modeValue} ({kv.Value})");
+                Logger.Info($"Manual override: switched to value={modeValue} ({modeName})");
             }
             else
             {
