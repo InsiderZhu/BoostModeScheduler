@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.1.0] - 2026-05-29
+
+### Added
+- 傻瓜式一键安装脚本 `setup.bat`，双击自动提权 → 安装服务 → 启动服务 → 打开配置工具
+- 压缩包内附默认 `config.json`，解压即用，无需手动配置
+
+### Changed
+- Release 统一为 `项目名-版本.zip` 单文件格式，内含全部所需文件
+
 ## [v1.0.1] - 2026-05-29
 
 ### Added
@@ -34,5 +43,6 @@
 - 日志写入 %ProgramData%\BoostModeSvc\logs\
 - 发布脚本 publish.bat、服务安装脚本 install-service.bat
 
+[v1.1.0]: https://github.com/InsiderZhu/BoostModeScheduler/releases/tag/v1.1.0
 [v1.0.1]: https://github.com/InsiderZhu/BoostModeScheduler/releases/tag/v1.0.1
 [1.0.0]: https://github.com/InsiderZhu/BoostModeScheduler/releases/tag/v1.0.0
