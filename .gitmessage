@@ -1,0 +1,25 @@
+# Conventional Commits 模板
+# <type>(<scope>): <subject>
+# │       │          │
+# │       │          └─ 简短描述，祈使句，小写开头，不加句号
+# │       │
+# │       └─ 影响范围 (可选): src/service, src/config, scripts, docs...
+# │
+# └─ 类型: feat, fix, docs, style, refactor, perf, test, chore, ci
+#
+# 类型说明:
+#   feat     新功能
+#   fix      修复 bug
+#   docs     文档/注释
+#   style    代码格式 (不影响功能)
+#   refactor 重构 (既非 feat 也非 fix)
+#   perf     性能优化
+#   test     测试相关
+#   chore    构建/工具/依赖
+#   ci       CI/CD 相关
+#
+# 示例:
+#   feat(service): auto-detect active power scheme GUID
+#   fix(common): use /Q instead of /GETACVALUEINDEX for reading mode
+#   feat(config): add manual mode selector dropdown
+#   chore: add .gitignore and initialize repo

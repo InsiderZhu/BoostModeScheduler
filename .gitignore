@@ -1,0 +1,42 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+*.csproj.user
+*.dbmdl
+*.jfm
+*.vs/
+**/[Rr]elea[sS]e/
+**/[Dd]ebug/
+
+# NuGet
+packages/
+*.nupkg
+**/[Pp]ackages/*
+
+# Publish output
+publish/
+*.pdb
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Scripts temp
+dotnet-install.ps1
+scripts/uac-launch.vbs
+
+# Logs
+*.log

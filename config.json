@@ -1,0 +1,24 @@
+{
+  "CpuLoadThreshold": 50,
+  "CpuIdleThreshold": 15,
+  "LoadHoldSeconds": 5,
+  "IdleHoldSeconds": 30,
+  "PollIntervalMs": 2000,
+  "IdleModeValue": 3,
+  "LoadModeValue": 1,
+  "UseProcessDetection": true,
+  "UseCpuDetection": true,
+  "ProcessWhitelist": [
+    "VALORANT.exe",
+    "VALORANT-Win64-Shipping.exe",
+    "RiotClientServices.exe",
+    "eldenring.exe",
+    "cyberpunk2077.exe",
+    "dota2.exe",
+    "cs2.exe",
+    "gta5.exe",
+    "apex.exe",
+    "wow.exe",
+    "r5apex.exe"
+  ]
+}

@@ -1,0 +1,474 @@
+using System.Diagnostics;
+using System.ServiceProcess;
+using BoostModeCommon;
+using BoostModeCommon.Models;
+
+namespace BoostModeConfig;
+
+public class MainForm : Form
+{
+    private AppConfig _config;
+    private readonly System.Windows.Forms.Timer _refreshTimer;
+    private ServiceController? _service;
+
+    private GroupBox grpService = null!, grpStatus = null!, grpSettings = null!;
+    private GroupBox grpWhitelist = null!, grpOverride = null!, grpLog = null!;
+    private Label lblServiceStatus = null!, lblCurrentMode = null!, lblCpuUsage = null!;
+    private Label lblGameProcesses = null!, lblLastSwitch = null!;
+    private Button btnStart = null!, btnStop = null!, btnRestart = null!;
+    private NumericUpDown numLoadThreshold = null!, numIdleThreshold = null!;
+    private NumericUpDown numPollInterval = null!, numLoadHold = null!, numIdleHold = null!;
+    private ComboBox cmbLoadMode = null!, cmbIdleMode = null!;
+    private ListBox lstProcesses = null!;
+    private TextBox txtNewProcess = null!;
+    private Button btnAdd = null!, btnRemove = null!;
+    private ComboBox cmbManualMode = null!;
+    private Button btnApplyManual = null!;
+    private Button btnSave = null!, btnRefresh = null!;
+    private Button btnEditConfig = null!, btnOpenLogFolder = null!, btnViewLog = null!;
+
+    private static readonly Dictionary<int, string> ModeNames = new()
+    {
+        { 0, "已禁用" }, { 1, "已启用" }, { 2, "积极" },
+        { 3, "高效" }, { 4, "积极高效" }, { 5, "高性能优先" }, { 6, "高效高性能优先" }
+    };
+
+    public MainForm()
+    {
+        Text = "BoostModeScheduler - 配置工具";
+        Size = new Size(680, 700);
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        StartPosition = FormStartPosition.CenterScreen;
+
+        _config = ConfigManager.Load();
+        BuildUI();
+
+        _refreshTimer = new System.Windows.Forms.Timer { Interval = 2000 };
+        _refreshTimer.Tick += (_, _) => RefreshStatus();
+        _refreshTimer.Start();
+
+        RefreshStatus();
+    }
+
+    private void BuildUI()
+    {
+        int y = 12;
+        const int x = 12;
+        const int fullWidth = 640;
+        const int halfWidth = (fullWidth - 12) / 2;
+
+        // ─── Service Control ───
+        grpService = new GroupBox { Text = "服务控制", Left = x, Top = y, Width = fullWidth, Height = 70 };
+        lblServiceStatus = new Label { Text = "状态: 检测中...", Left = 12, Top = 22, Width = 300, Height = 20 };
+        lblServiceStatus.Font = new Font(lblServiceStatus.Font, FontStyle.Bold);
+        grpService.Controls.Add(lblServiceStatus);
+
+        btnStart = new Button { Text = "启动", Left = 340, Top = 18, Width = 70, Height = 28 };
+        btnStart.Click += (_, _) => ControlService("start");
+        grpService.Controls.Add(btnStart);
+
+        btnStop = new Button { Text = "停止", Left = 416, Top = 18, Width = 70, Height = 28 };
+        btnStop.Click += (_, _) => ControlService("stop");
+        grpService.Controls.Add(btnStop);
+
+        btnRestart = new Button { Text = "重启", Left = 492, Top = 18, Width = 70, Height = 28 };
+        btnRestart.Click += (_, _) => ControlService("restart");
+        grpService.Controls.Add(btnRestart);
+        Controls.Add(grpService);
+        y += 80;
+
+        // ─── Current Status ───
+        grpStatus = new GroupBox { Text = "当前状态", Left = x, Top = y, Width = fullWidth, Height = 90 };
+        lblCurrentMode = new Label { Text = "当前模式: --", Left = 12, Top = 22, Width = 300, Height = 18 };
+        lblCurrentMode.Font = new Font(lblCurrentMode.Font, FontStyle.Bold);
+        grpStatus.Controls.Add(lblCurrentMode);
+
+        lblCpuUsage = new Label { Text = "CPU 占用: --", Left = 320, Top = 22, Width = 200, Height = 18 };
+        grpStatus.Controls.Add(lblCpuUsage);
+
+        lblGameProcesses = new Label { Text = "检测到游戏进程: 无", Left = 12, Top = 44, Width = 610, Height = 18 };
+        grpStatus.Controls.Add(lblGameProcesses);
+
+        lblLastSwitch = new Label { Text = "上次切换原因: --", Left = 12, Top = 64, Width = 610, Height = 18 };
+        grpStatus.Controls.Add(lblLastSwitch);
+        Controls.Add(grpStatus);
+        y += 100;
+
+        // ─── Settings ───
+        grpSettings = new GroupBox { Text = "检测设置", Left = x, Top = y, Width = halfWidth, Height = 220 };
+
+        AddLabeledControl(grpSettings, "CPU 负载阈值 (≥此值切负载):", 12, 22);
+        numLoadThreshold = new NumericUpDown { Left = 260, Top = 20, Width = 65, Minimum = 1, Maximum = 100, Value = _config.CpuLoadThreshold };
+        grpSettings.Controls.Add(numLoadThreshold);
+        new Label { Text = "%", Left = 330, Top = 23, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+
+        AddLabeledControl(grpSettings, "CPU 空闲阈值 (<此值切空闲):", 12, 52);
+        numIdleThreshold = new NumericUpDown { Left = 260, Top = 50, Width = 65, Minimum = 0, Maximum = 100, Value = _config.CpuIdleThreshold };
+        grpSettings.Controls.Add(numIdleThreshold);
+        new Label { Text = "%", Left = 330, Top = 53, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+
+        AddLabeledControl(grpSettings, "升载确认时间:", 12, 82);
+        numLoadHold = new NumericUpDown { Left = 260, Top = 80, Width = 65, Minimum = 1, Maximum = 120, Value = _config.LoadHoldSeconds };
+        grpSettings.Controls.Add(numLoadHold);
+        new Label { Text = "秒", Left = 330, Top = 83, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+
+        AddLabeledControl(grpSettings, "降载确认时间:", 12, 112);
+        numIdleHold = new NumericUpDown { Left = 260, Top = 110, Width = 65, Minimum = 1, Maximum = 300, Value = _config.IdleHoldSeconds };
+        grpSettings.Controls.Add(numIdleHold);
+        new Label { Text = "秒", Left = 330, Top = 113, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+
+        AddLabeledControl(grpSettings, "轮询间隔:", 12, 142);
+        numPollInterval = new NumericUpDown { Left = 260, Top = 140, Width = 65, Minimum = 500, Maximum = 30000, Increment = 500, Value = _config.PollIntervalMs };
+        grpSettings.Controls.Add(numPollInterval);
+        new Label { Text = "毫秒", Left = 330, Top = 143, Width = 40 }.Let(l => grpSettings.Controls.Add(l));
+
+        AddLabeledControl(grpSettings, "空闲模式:", 12, 172);
+        cmbIdleMode = CreateModeCombo(260, 170, _config.IdleModeValue);
+        grpSettings.Controls.Add(cmbIdleMode);
+
+        AddLabeledControl(grpSettings, "负载模式:", 12, 197);
+        cmbLoadMode = CreateModeCombo(260, 195, _config.LoadModeValue);
+        grpSettings.Controls.Add(cmbLoadMode);
+
+        Controls.Add(grpSettings);
+
+        // ─── Whitelist ───
+        grpWhitelist = new GroupBox { Text = "进程白名单", Left = x + halfWidth + 12, Top = y, Width = halfWidth - 12, Height = 220 };
+
+        lstProcesses = new ListBox { Left = 8, Top = 18, Width = 290, Height = 140 };
+        foreach (var p in _config.ProcessWhitelist) lstProcesses.Items.Add(p);
+        grpWhitelist.Controls.Add(lstProcesses);
+
+        txtNewProcess = new TextBox { Left = 8, Top = 164, Width = 210, Height = 22, PlaceholderText = "输入进程名 (如 valorant.exe)" };
+        grpWhitelist.Controls.Add(txtNewProcess);
+
+        btnAdd = new Button { Text = "添加", Left = 222, Top = 163, Width = 76, Height = 24 };
+        btnAdd.Click += (_, _) =>
+        {
+            var name = txtNewProcess.Text.Trim();
+            if (!string.IsNullOrEmpty(name) && !lstProcesses.Items.Contains(name))
+            {
+                lstProcesses.Items.Add(name);
+                txtNewProcess.Clear();
+            }
+        };
+        grpWhitelist.Controls.Add(btnAdd);
+
+        btnRemove = new Button { Text = "删除选中", Left = 8, Top = 192, Width = 290, Height = 24 };
+        btnRemove.Click += (_, _) =>
+        {
+            var selected = lstProcesses.SelectedItems.Cast<string>().ToList();
+            foreach (var item in selected) lstProcesses.Items.Remove(item);
+        };
+        grpWhitelist.Controls.Add(btnRemove);
+
+        Controls.Add(grpWhitelist);
+        y += 230;
+
+        // ─── Manual Override ───
+        grpOverride = new GroupBox { Text = "手动切换模式", Left = x, Top = y, Width = fullWidth, Height = 56 };
+
+        new Label { Text = "选择模式:", Left = 12, Top = 22, Width = 70, Height = 20 }.Let(l =>
+        {
+            l.TextAlign = ContentAlignment.MiddleRight;
+            grpOverride.Controls.Add(l);
+        });
+
+        cmbManualMode = CreateModeCombo(88, 20, _config.LoadModeValue);
+        cmbManualMode.Width = 160;
+        grpOverride.Controls.Add(cmbManualMode);
+
+        btnApplyManual = new Button { Text = "立即切换到所选模式", Left = 260, Top = 18, Width = 170, Height = 28 };
+        btnApplyManual.BackColor = Color.LightCoral;
+        btnApplyManual.Click += (_, _) => ForceManualMode();
+        grpOverride.Controls.Add(btnApplyManual);
+
+        Controls.Add(grpOverride);
+        y += 66;
+
+        // ─── Log ───
+        grpLog = new GroupBox { Text = "日志管理", Left = x, Top = y, Width = fullWidth, Height = 56 };
+
+        btnOpenLogFolder = new Button { Text = "打开日志文件夹", Left = 12, Top = 18, Width = 150, Height = 28 };
+        btnOpenLogFolder.Click += (_, _) =>
+        {
+            try { Process.Start("explorer.exe", ConfigManager.GetLogDir()); }
+            catch (Exception ex) { ShowError($"无法打开: {ex.Message}"); }
+        };
+        grpLog.Controls.Add(btnOpenLogFolder);
+
+        btnViewLog = new Button { Text = "查看最近日志", Left = 172, Top = 18, Width = 150, Height = 28 };
+        btnViewLog.Click += (_, _) => ShowLogViewer();
+        grpLog.Controls.Add(btnViewLog);
+
+        Controls.Add(grpLog);
+        y += 66;
+
+        // ─── Bottom Buttons ───
+        btnEditConfig = new Button { Text = "用记事本编辑 config", Left = x, Top = y, Width = 150, Height = 36 };
+        btnEditConfig.Click += (_, _) =>
+        {
+            try { Process.Start("notepad.exe", ConfigManager.GetConfigPath()); }
+            catch (Exception ex) { ShowError($"无法打开: {ex.Message}"); }
+        };
+        Controls.Add(btnEditConfig);
+
+        btnSave = new Button { Text = "保存配置并重启服务", Left = x + 315, Top = y, Width = 160, Height = 36 };
+        btnSave.BackColor = Color.LightGreen;
+        btnSave.Click += (_, _) => SaveAndRestart();
+        Controls.Add(btnSave);
+
+        btnRefresh = new Button { Text = "刷新", Left = x + 485, Top = y, Width = 140, Height = 36 };
+        btnRefresh.Click += (_, _) => RefreshStatus();
+        Controls.Add(btnRefresh);
+
+        Height = y + 90;
+    }
+
+    private ComboBox CreateModeCombo(int x, int y, int selected)
+    {
+        var cmb = new ComboBox { Left = x, Top = y, Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
+        cmb.Items.AddRange(ModeNames.Select(kv => (object)new KeyValuePair<int, string>(kv.Key, $"{kv.Key} - {kv.Value}")).ToArray());
+        cmb.DisplayMember = "Value";
+        cmb.ValueMember = "Key";
+
+        for (int i = 0; i < cmb.Items.Count; i++)
+        {
+            var item = (KeyValuePair<int, string>)cmb.Items[i];
+            if (item.Key == selected)
+            {
+                cmb.SelectedIndex = i;
+                break;
+            }
+        }
+        if (cmb.SelectedIndex < 0) cmb.SelectedIndex = 0;
+        return cmb;
+    }
+
+    private static void AddLabeledControl(GroupBox parent, string text, int x, int y)
+    {
+        parent.Controls.Add(new Label { Text = text, Left = x, Top = y, Width = 230, Height = 18, TextAlign = ContentAlignment.MiddleRight });
+    }
+
+    private void RefreshStatus()
+    {
+        try
+        {
+            _service ??= new ServiceController("BoostModeSvc");
+            var status = _service.Status;
+            lblServiceStatus.Text = $"状态: {(status == ServiceControllerStatus.Running ? "● 运行中" : "○ 已停止")}";
+            lblServiceStatus.ForeColor = status == ServiceControllerStatus.Running ? Color.Green : Color.Red;
+            btnStart.Enabled = status != ServiceControllerStatus.Running;
+            btnStop.Enabled = status == ServiceControllerStatus.Running;
+        }
+        catch (InvalidOperationException)
+        {
+            lblServiceStatus.Text = "状态: 服务未安装";
+            lblServiceStatus.ForeColor = Color.Gray;
+            btnStart.Enabled = btnStop.Enabled = false;
+        }
+        catch (Exception ex)
+        {
+            lblServiceStatus.Text = $"状态: 错误 - {ex.Message}";
+            lblServiceStatus.ForeColor = Color.Red;
+        }
+
+        try
+        {
+            var statusInfo = ConfigManager.LoadStatus();
+            if (statusInfo != null)
+            {
+                lblCurrentMode.Text = $"当前模式: {statusInfo.CurrentMode} (值={statusInfo.CurrentModeValue})";
+                lblCpuUsage.Text = $"CPU 占用: {statusInfo.CpuUsage:F1}%";
+                lblGameProcesses.Text = $"检测到游戏进程: {(statusInfo.GameProcesses.Count > 0 ? string.Join(", ", statusInfo.GameProcesses) : "无")}";
+                lblLastSwitch.Text = $"上次切换原因: {statusInfo.LastSwitchReason ?? "--"}";
+            }
+        }
+        catch
+        {
+            lblCurrentMode.Text = "当前模式: 读取失败";
+            lblCpuUsage.Text = "CPU 占用: --";
+        }
+    }
+
+    private void SaveAndRestart()
+    {
+        try
+        {
+            _config.CpuLoadThreshold = (int)numLoadThreshold.Value;
+            _config.CpuIdleThreshold = (int)numIdleThreshold.Value;
+            _config.LoadHoldSeconds = (int)numLoadHold.Value;
+            _config.IdleHoldSeconds = (int)numIdleHold.Value;
+            _config.PollIntervalMs = (int)numPollInterval.Value;
+            _config.IdleModeValue = ((KeyValuePair<int, string>)cmbIdleMode.SelectedItem).Key;
+            _config.LoadModeValue = ((KeyValuePair<int, string>)cmbLoadMode.SelectedItem).Key;
+            _config.ProcessWhitelist = lstProcesses.Items.Cast<string>().ToList();
+
+            if (!ConfigManager.Save(_config))
+            {
+                ShowError("保存配置失败");
+                return;
+            }
+
+            ControlService("restart");
+            MessageBox.Show("配置已保存并重启服务", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"保存失败: {ex.Message}");
+        }
+    }
+
+    private void ControlService(string action)
+    {
+        try
+        {
+            _service ??= new ServiceController("BoostModeSvc");
+
+            switch (action)
+            {
+                case "start":
+                    _service.Start();
+                    _service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                    Logger.Info("Service started manually via config tool");
+                    break;
+                case "stop":
+                    _service.Stop();
+                    _service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+                    Logger.Info("Service stopped manually via config tool");
+                    break;
+                case "restart":
+                    if (_service.Status == ServiceControllerStatus.Running)
+                    {
+                        _service.Stop();
+                        _service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+                    }
+                    _service.Start();
+                    _service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                    Logger.Info("Service restarted via config tool");
+                    break;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            ShowError("服务未安装。请先运行 install-service.bat 安装服务。");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"操作失败: {ex.Message}");
+        }
+        RefreshStatus();
+    }
+
+    private void ForceManualMode()
+    {
+        if (cmbManualMode.SelectedItem == null)
+        {
+            ShowError("请先选择一个模式");
+            return;
+        }
+
+        var kv = (KeyValuePair<int, string>)cmbManualMode.SelectedItem;
+        int modeValue = kv.Key;
+        string modeName = $"{kv.Key} - {kv.Value}";
+
+        try
+        {
+            var switcher = new PowerModeSwitcher();
+            if (switcher.SwitchTo(modeValue, out string output))
+            {
+                MessageBox.Show($"已强制切换到 [{modeName}]\n\n结果: {output}",
+                    "手动切换", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Logger.Info($"Manual override: switched to value={modeValue} ({kv.Value})");
+            }
+            else
+            {
+                ShowError($"切换失败: {output}");
+            }
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"切换失败: {ex.Message}");
+        }
+    }
+
+    private void ShowLogViewer()
+    {
+        var logDir = ConfigManager.GetLogDir();
+        if (!Directory.Exists(logDir))
+        {
+            ShowError("日志目录不存在，服务可能尚未写日志");
+            return;
+        }
+
+        var logFiles = Directory.GetFiles(logDir, "*.log").OrderByDescending(f => f).Take(3).ToArray();
+        if (logFiles.Length == 0)
+        {
+            ShowError("没有找到日志文件");
+            return;
+        }
+
+        var logContent = new System.Text.StringBuilder();
+        logContent.AppendLine($"=== 最近日志 (来自 {logFiles.Length} 个文件) ===");
+        logContent.AppendLine();
+
+        foreach (var file in logFiles)
+        {
+            try
+            {
+                var lines = File.ReadAllLines(file);
+                var tail = lines.Length > 60 ? lines[^60..] : lines;
+                logContent.AppendLine($"--- {Path.GetFileName(file)} ({tail.Length}/{lines.Length} 行) ---");
+                logContent.AppendLine(string.Join(Environment.NewLine, tail));
+                logContent.AppendLine();
+            }
+            catch { }
+        }
+
+        var viewer = new Form
+        {
+            Text = "日志查看器",
+            Size = new Size(800, 600),
+            StartPosition = FormStartPosition.CenterParent
+        };
+
+        var textBox = new TextBox
+        {
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Both,
+            WordWrap = false,
+            Font = new Font("Consolas", 10),
+            Dock = DockStyle.Fill,
+            Text = logContent.ToString()
+        };
+        viewer.Controls.Add(textBox);
+
+        var closeBtn = new Button
+        {
+            Text = "关闭",
+            Dock = DockStyle.Bottom,
+            Height = 36
+        };
+        closeBtn.Click += (_, _) => viewer.Close();
+        viewer.Controls.Add(closeBtn);
+
+        viewer.ShowDialog();
+    }
+
+    private void ShowError(string message)
+    {
+        MessageBox.Show(message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+public static class Extensions
+{
+    public static T Let<T>(this T obj, Action<T> action)
+    {
+        action(obj);
+        return obj;
+    }
+}
