@@ -10,7 +10,8 @@ Write-Host "  BoostModeScheduler - 安装服务" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$serviceExe = "E:\project\BoostModeScheduler\publish\service\BoostModeService.exe"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$serviceExe = Join-Path $scriptDir "..\publish\service\BoostModeService.exe"
 $configDir = "$env:ProgramData\BoostModeSvc"
 
 if (-not (Test-Path $serviceExe)) {
@@ -54,7 +55,7 @@ if ($startResult -eq 0) {
 }
 
 Write-Host ""
-Write-Host "📌 配置工具: E:\project\BoostModeScheduler\publish\config\BoostModeConfig.exe" -ForegroundColor White
+Write-Host "📌 配置工具: $scriptDir\..\publish\config\BoostModeConfig.exe" -ForegroundColor White
 Write-Host "📌 配置文件: $configDir\config.json" -ForegroundColor White
 Write-Host "📌 日志目录: $configDir\logs" -ForegroundColor White
 Write-Host ""

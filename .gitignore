@@ -40,3 +40,9 @@ scripts/uac-launch.vbs
 
 # Logs
 *.log
+
+# CodeGraph index
+.codegraph/
+
+# Dev-only agent instructions
+AGENTS.md
