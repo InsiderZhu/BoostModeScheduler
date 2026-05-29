@@ -14,7 +14,8 @@ public class Worker : BackgroundService
     private int _loadTickCount;
     private int _idleTickCount;
     private bool _isLoadMode;
-    private int _currentModeValue = -1;
+    private int _currentAcValue = -1;
+    private int _currentDcValue = -1;
     private string _lastSwitchReason = "";
     private readonly DateTime _startTime = DateTime.Now;
 
@@ -37,10 +38,11 @@ public class Worker : BackgroundService
 
         _processDetector = new ProcessDetector(_config.ProcessWhitelist);
 
-        _currentModeValue = _powerSwitcher.ReadCurrentMode();
-        _isLoadMode = _currentModeValue == _config.LoadModeValue;
+        _currentAcValue = _powerSwitcher.ReadCurrentMode();
+        _currentDcValue = _currentAcValue;
+        _isLoadMode = _currentAcValue == _config.LoadModeValueAc;
 
-        Logger.Info($"Initial mode: {(_isLoadMode ? "LOAD" : "IDLE")} (value={_currentModeValue})");
+        Logger.Info($"Initial mode: {(_isLoadMode ? "LOAD" : "IDLE")} (AC={_currentAcValue}, DC={_currentDcValue})");
         Logger.Info($"Config: LoadThreshold={_config.CpuLoadThreshold}%, IdleThreshold={_config.CpuIdleThreshold}%");
         Logger.Info($"Config: LoadHold={_config.LoadHoldSeconds}s, IdleHold={_config.IdleHoldSeconds}s");
         Logger.Info($"Config: ProcessDetection={_config.UseProcessDetection}, CpuDetection={_config.UseCpuDetection}");
@@ -63,15 +65,17 @@ public class Worker : BackgroundService
 
                 if (shouldBeLoad != _isLoadMode)
                 {
-                    int targetMode = shouldBeLoad ? _config.LoadModeValue : _config.IdleModeValue;
+                    int targetAc = shouldBeLoad ? _config.LoadModeValueAc : _config.IdleModeValueAc;
+                    int targetDc = shouldBeLoad ? _config.LoadModeValueDc : _config.IdleModeValueDc;
                     string reason = BuildReason(cpuUsage, hasGame, gameProcesses);
 
-                    if (_powerSwitcher.SwitchTo(targetMode, out string output))
+                    if (_powerSwitcher.SwitchToSeparate(targetAc, targetDc, out string output))
                     {
                         _isLoadMode = shouldBeLoad;
-                        _currentModeValue = targetMode;
+                        _currentAcValue = targetAc;
+                        _currentDcValue = targetDc;
                         _lastSwitchReason = reason;
-                        Logger.Info($"SWITCH: -> {(shouldBeLoad ? "LOAD" : "IDLE")} (value={targetMode})");
+                        Logger.Info($"SWITCH: -> {(shouldBeLoad ? "LOAD" : "IDLE")} (AC={targetAc}, DC={targetDc})");
                         Logger.Info($"  Reason: {reason}");
                         Logger.Info($"  Result: {output}");
                     }
@@ -123,7 +127,8 @@ public class Worker : BackgroundService
         var status = new StatusInfo
         {
             CurrentMode = _isLoadMode ? "LOAD" : "IDLE",
-            CurrentModeValue = _currentModeValue,
+            CurrentModeValueAc = _currentAcValue,
+            CurrentModeValueDc = _currentDcValue,
             CpuUsage = Math.Round(cpu, 1),
             GameProcesses = gameProcesses,
             LastSwitchReason = _lastSwitchReason,

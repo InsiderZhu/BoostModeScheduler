@@ -88,12 +88,11 @@ public partial class PowerModeSwitcher
 
     public bool SwitchTo(int modeValue, out string output)
     {
-        if (modeValue == _currentMode)
-        {
-            output = $"Already in mode {modeValue}, skipped";
-            return true;
-        }
+        return SwitchToSeparate(modeValue, modeValue, out output);
+    }
 
+    public bool SwitchToSeparate(int acValue, int dcValue, out string output)
+    {
         var scheme = GetActiveSchemeGuid();
         if (string.IsNullOrEmpty(scheme))
         {
@@ -105,16 +104,16 @@ public partial class PowerModeSwitcher
 
         try
         {
-            var acResult = RunPowerCfg($"/SETACVALUEINDEX {scheme} {SubProcessorGuid} {SettingGuid} {modeValue}");
+            var acResult = RunPowerCfg($"/SETACVALUEINDEX {scheme} {SubProcessorGuid} {SettingGuid} {acValue}");
             sb.Append($"AC:{acResult}; ");
 
-            var dcResult = RunPowerCfg($"/SETDCVALUEINDEX {scheme} {SubProcessorGuid} {SettingGuid} {modeValue}");
+            var dcResult = RunPowerCfg($"/SETDCVALUEINDEX {scheme} {SubProcessorGuid} {SettingGuid} {dcValue}");
             sb.Append($"DC:{dcResult}; ");
 
             var activeResult = RunPowerCfg($"/SETACTIVE {scheme}");
             sb.Append($"Active:{activeResult}");
 
-            _currentMode = modeValue;
+            _currentMode = acValue;
             _cachedSchemeGuid = scheme;
             output = sb.ToString();
             return true;

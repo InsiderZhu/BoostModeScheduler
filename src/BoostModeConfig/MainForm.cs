@@ -19,11 +19,12 @@ public class MainForm : Form
     private Button btnStart = null!, btnStop = null!, btnRestart = null!;
     private NumericUpDown numLoadThreshold = null!, numIdleThreshold = null!;
     private NumericUpDown numPollInterval = null!, numLoadHold = null!, numIdleHold = null!;
-    private ComboBox cmbLoadMode = null!, cmbIdleMode = null!;
+    private ComboBox cmbIdleModeAc = null!, cmbIdleModeDc = null!;
+    private ComboBox cmbLoadModeAc = null!, cmbLoadModeDc = null!;
     private ListBox lstProcesses = null!;
     private TextBox txtNewProcess = null!;
     private Button btnAdd = null!, btnRemove = null!;
-    private ComboBox cmbManualMode = null!;
+    private ComboBox cmbManualAc = null!, cmbManualDc = null!;
     private Button btnApplyManual = null!;
     private Button btnSave = null!, btnRefresh = null!;
     private Button btnEditConfig = null!, btnOpenLogFolder = null!, btnViewLog = null!;
@@ -31,7 +32,7 @@ public class MainForm : Form
     public MainForm()
     {
         Text = "BoostModeScheduler - 配置工具";
-        Size = new Size(680, 700);
+        Size = new Size(680, 720);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
@@ -113,45 +114,53 @@ public class MainForm : Form
         y += 100;
 
         // ─── Settings ───
-        grpSettings = new GroupBox { Text = "检测设置", Left = x, Top = y, Width = halfWidth, Height = 220 };
+        grpSettings = new GroupBox { Text = "检测设置", Left = x, Top = y, Width = halfWidth, Height = 250 };
 
-        AddLabeledControl(grpSettings, "CPU 负载阈值 (≥此值切负载):", 12, 22);
-        numLoadThreshold = new NumericUpDown { Left = 260, Top = 20, Width = 65, Minimum = 1, Maximum = 100, Value = _config.CpuLoadThreshold };
+        AddLabeledControl(grpSettings, "CPU 负载阈值 (≥此值切负载):", 8, 22);
+        numLoadThreshold = new NumericUpDown { Left = 240, Top = 20, Width = 65, Minimum = 1, Maximum = 100, Value = _config.CpuLoadThreshold };
         grpSettings.Controls.Add(numLoadThreshold);
-        new Label { Text = "%", Left = 330, Top = 23, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "%", Left = 310, Top = 23, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
 
-        AddLabeledControl(grpSettings, "CPU 空闲阈值 (<此值切空闲):", 12, 52);
-        numIdleThreshold = new NumericUpDown { Left = 260, Top = 50, Width = 65, Minimum = 0, Maximum = 100, Value = _config.CpuIdleThreshold };
+        AddLabeledControl(grpSettings, "CPU 空闲阈值 (<此值切空闲):", 8, 52);
+        numIdleThreshold = new NumericUpDown { Left = 240, Top = 50, Width = 65, Minimum = 0, Maximum = 100, Value = _config.CpuIdleThreshold };
         grpSettings.Controls.Add(numIdleThreshold);
-        new Label { Text = "%", Left = 330, Top = 53, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "%", Left = 310, Top = 53, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
 
-        AddLabeledControl(grpSettings, "升载确认时间:", 12, 82);
-        numLoadHold = new NumericUpDown { Left = 260, Top = 80, Width = 65, Minimum = 1, Maximum = 120, Value = _config.LoadHoldSeconds };
+        AddLabeledControl(grpSettings, "升载确认时间:", 8, 82);
+        numLoadHold = new NumericUpDown { Left = 240, Top = 80, Width = 65, Minimum = 1, Maximum = 120, Value = _config.LoadHoldSeconds };
         grpSettings.Controls.Add(numLoadHold);
-        new Label { Text = "秒", Left = 330, Top = 83, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "秒", Left = 310, Top = 83, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
 
-        AddLabeledControl(grpSettings, "降载确认时间:", 12, 112);
-        numIdleHold = new NumericUpDown { Left = 260, Top = 110, Width = 65, Minimum = 1, Maximum = 300, Value = _config.IdleHoldSeconds };
+        AddLabeledControl(grpSettings, "降载确认时间:", 8, 112);
+        numIdleHold = new NumericUpDown { Left = 240, Top = 110, Width = 65, Minimum = 1, Maximum = 300, Value = _config.IdleHoldSeconds };
         grpSettings.Controls.Add(numIdleHold);
-        new Label { Text = "秒", Left = 330, Top = 113, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "秒", Left = 310, Top = 113, Width = 30 }.Let(l => grpSettings.Controls.Add(l));
 
-        AddLabeledControl(grpSettings, "轮询间隔:", 12, 142);
-        numPollInterval = new NumericUpDown { Left = 260, Top = 140, Width = 65, Minimum = 500, Maximum = 30000, Increment = 500, Value = _config.PollIntervalMs };
+        AddLabeledControl(grpSettings, "轮询间隔:", 8, 142);
+        numPollInterval = new NumericUpDown { Left = 240, Top = 140, Width = 65, Minimum = 500, Maximum = 30000, Increment = 500, Value = _config.PollIntervalMs };
         grpSettings.Controls.Add(numPollInterval);
-        new Label { Text = "毫秒", Left = 330, Top = 143, Width = 40 }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "毫秒", Left = 310, Top = 143, Width = 40 }.Let(l => grpSettings.Controls.Add(l));
 
-        AddLabeledControl(grpSettings, "空闲模式:", 12, 172);
-        cmbIdleMode = CreateModeCombo(260, 170, _config.IdleModeValue);
-        grpSettings.Controls.Add(cmbIdleMode);
+        // Column header
+        new Label { Text = "AC", Left = 220, Top = 170, Width = 25, Height = 18, Font = new Font(Font, FontStyle.Underline), TextAlign = ContentAlignment.MiddleCenter }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "DC", Left = 280, Top = 170, Width = 25, Height = 18, Font = new Font(Font, FontStyle.Underline), TextAlign = ContentAlignment.MiddleCenter }.Let(l => grpSettings.Controls.Add(l));
 
-        AddLabeledControl(grpSettings, "负载模式:", 12, 197);
-        cmbLoadMode = CreateModeCombo(260, 195, _config.LoadModeValue);
-        grpSettings.Controls.Add(cmbLoadMode);
+        AddLabeledControl(grpSettings, "空闲模式:", 8, 192);
+        cmbIdleModeAc = CreateModeCombo(218, 190, _config.IdleModeValueAc, 55);
+        grpSettings.Controls.Add(cmbIdleModeAc);
+        cmbIdleModeDc = CreateModeCombo(278, 190, _config.IdleModeValueDc, 55);
+        grpSettings.Controls.Add(cmbIdleModeDc);
+
+        AddLabeledControl(grpSettings, "负载模式:", 8, 218);
+        cmbLoadModeAc = CreateModeCombo(218, 216, _config.LoadModeValueAc, 55);
+        grpSettings.Controls.Add(cmbLoadModeAc);
+        cmbLoadModeDc = CreateModeCombo(278, 216, _config.LoadModeValueDc, 55);
+        grpSettings.Controls.Add(cmbLoadModeDc);
 
         Controls.Add(grpSettings);
 
         // ─── Whitelist ───
-        grpWhitelist = new GroupBox { Text = "进程白名单", Left = x + halfWidth + 12, Top = y, Width = halfWidth - 12, Height = 220 };
+        grpWhitelist = new GroupBox { Text = "进程白名单", Left = x + halfWidth + 12, Top = y, Width = halfWidth - 12, Height = 250 };
 
         lstProcesses = new ListBox { Left = 8, Top = 18, Width = 290, Height = 140 };
         foreach (var p in _config.ProcessWhitelist) lstProcesses.Items.Add(p);
@@ -181,22 +190,22 @@ public class MainForm : Form
         grpWhitelist.Controls.Add(btnRemove);
 
         Controls.Add(grpWhitelist);
-        y += 230;
+        y += 260;
 
         // ─── Manual Override ───
-        grpOverride = new GroupBox { Text = "手动切换模式", Left = x, Top = y, Width = fullWidth, Height = 56 };
+        grpOverride = new GroupBox { Text = "手动切换模式 (AC=电源, DC=电池)", Left = x, Top = y, Width = fullWidth, Height = 56 };
 
-        new Label { Text = "选择模式:", Left = 12, Top = 22, Width = 70, Height = 20 }.Let(l =>
-        {
-            l.TextAlign = ContentAlignment.MiddleRight;
-            grpOverride.Controls.Add(l);
-        });
+        new Label { Text = "AC:", Left = 12, Top = 22, Width = 25, Height = 20, TextAlign = ContentAlignment.MiddleRight }.Let(l => grpOverride.Controls.Add(l));
+        cmbManualAc = CreateModeCombo(40, 20, _config.LoadModeValueAc, 120);
+        cmbManualAc.Width = 150;
+        grpOverride.Controls.Add(cmbManualAc);
 
-        cmbManualMode = CreateModeCombo(88, 20, _config.LoadModeValue);
-        cmbManualMode.Width = 200;
-        grpOverride.Controls.Add(cmbManualMode);
+        new Label { Text = "DC:", Left = 200, Top = 22, Width = 25, Height = 20, TextAlign = ContentAlignment.MiddleRight }.Let(l => grpOverride.Controls.Add(l));
+        cmbManualDc = CreateModeCombo(228, 20, _config.LoadModeValueDc, 120);
+        cmbManualDc.Width = 150;
+        grpOverride.Controls.Add(cmbManualDc);
 
-        btnApplyManual = new Button { Text = "立即切换到所选模式", Left = 300, Top = 18, Width = 170, Height = 28 };
+        btnApplyManual = new Button { Text = "立即切换", Left = 390, Top = 18, Width = 130, Height = 28 };
         btnApplyManual.BackColor = Color.LightCoral;
         btnApplyManual.Click += (_, _) => ForceManualMode();
         grpOverride.Controls.Add(btnApplyManual);
@@ -243,9 +252,9 @@ public class MainForm : Form
         Height = y + 90;
     }
 
-    private ComboBox CreateModeCombo(int x, int y, int selected)
+    private ComboBox CreateModeCombo(int x, int y, int selected, int width)
     {
-        var cmb = new ComboBox { Left = x, Top = y, Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
+        var cmb = new ComboBox { Left = x, Top = y, Width = width, DropDownStyle = ComboBoxStyle.DropDownList };
 
         var items = _modeNames
             .OrderBy(kv => kv.Key)
@@ -258,7 +267,7 @@ public class MainForm : Form
 
         for (int i = 0; i < cmb.Items.Count; i++)
         {
-            var item = (KeyValuePair<int, string>)cmb.Items[i];
+            var item = (KeyValuePair<int, string>)cmb.Items[i]!;
             if (item.Key == selected)
             {
                 cmb.SelectedIndex = i;
@@ -269,9 +278,15 @@ public class MainForm : Form
         return cmb;
     }
 
+    private static int GetModeKey(ComboBox cmb)
+    {
+        var kv = cmb.SelectedItem;
+        return kv is KeyValuePair<int, string> pair ? pair.Key : 0;
+    }
+
     private static void AddLabeledControl(GroupBox parent, string text, int x, int y)
     {
-        parent.Controls.Add(new Label { Text = text, Left = x, Top = y, Width = 230, Height = 18, TextAlign = ContentAlignment.MiddleRight });
+        parent.Controls.Add(new Label { Text = text, Left = x, Top = y, Width = 200, Height = 18, TextAlign = ContentAlignment.MiddleRight });
     }
 
     private void RefreshStatus()
@@ -302,8 +317,9 @@ public class MainForm : Form
             var statusInfo = ConfigManager.LoadStatus();
             if (statusInfo != null)
             {
-                var modeName = _modeNames.GetValueOrDefault(statusInfo.CurrentModeValue, $"?({statusInfo.CurrentModeValue})");
-                lblCurrentMode.Text = $"当前模式: {statusInfo.CurrentMode} ({modeName})";
+                var acName = _modeNames.GetValueOrDefault(statusInfo.CurrentModeValueAc, $"?({statusInfo.CurrentModeValueAc})");
+                var dcName = _modeNames.GetValueOrDefault(statusInfo.CurrentModeValueDc, $"?({statusInfo.CurrentModeValueDc})");
+                lblCurrentMode.Text = $"当前模式: {statusInfo.CurrentMode} (AC={acName}, DC={dcName})";
                 lblCpuUsage.Text = $"CPU 占用: {statusInfo.CpuUsage:F1}%";
                 lblGameProcesses.Text = $"检测到游戏进程: {(statusInfo.GameProcesses.Count > 0 ? string.Join(", ", statusInfo.GameProcesses) : "无")}";
                 lblLastSwitch.Text = $"上次切换原因: {statusInfo.LastSwitchReason ?? "--"}";
@@ -325,8 +341,10 @@ public class MainForm : Form
             _config.LoadHoldSeconds = (int)numLoadHold.Value;
             _config.IdleHoldSeconds = (int)numIdleHold.Value;
             _config.PollIntervalMs = (int)numPollInterval.Value;
-            _config.IdleModeValue = ((KeyValuePair<int, string>)cmbIdleMode.SelectedItem).Key;
-            _config.LoadModeValue = ((KeyValuePair<int, string>)cmbLoadMode.SelectedItem).Key;
+            _config.IdleModeValueAc = GetModeKey(cmbIdleModeAc);
+            _config.IdleModeValueDc = GetModeKey(cmbIdleModeDc);
+            _config.LoadModeValueAc = GetModeKey(cmbLoadModeAc);
+            _config.LoadModeValueDc = GetModeKey(cmbLoadModeDc);
             _config.ProcessWhitelist = lstProcesses.Items.Cast<string>().ToList();
 
             if (!ConfigManager.Save(_config))
@@ -387,24 +405,25 @@ public class MainForm : Form
 
     private void ForceManualMode()
     {
-        if (cmbManualMode.SelectedItem == null)
+        if (cmbManualAc.SelectedItem == null || cmbManualDc.SelectedItem == null)
         {
-            ShowError("请先选择一个模式");
+            ShowError("请先选择 AC 和 DC 模式");
             return;
         }
 
-        var kv = (KeyValuePair<int, string>)cmbManualMode.SelectedItem;
-        int modeValue = kv.Key;
-        string modeName = kv.Value;
+        int acVal = GetModeKey(cmbManualAc);
+        string acName = _modeNames.GetValueOrDefault(acVal, "?");
+        int dcVal = GetModeKey(cmbManualDc);
+        string dcName = _modeNames.GetValueOrDefault(dcVal, "?");
 
         try
         {
             var switcher = new PowerModeSwitcher();
-            if (switcher.SwitchTo(modeValue, out string output))
+            if (switcher.SwitchToSeparate(acVal, dcVal, out string output))
             {
-                MessageBox.Show($"已强制切换到 [{modeName}]\n\n结果: {output}",
+                MessageBox.Show($"已强制切换\nAC={acName}\nDC={dcName}\n\n结果: {output}",
                     "手动切换", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                Logger.Info($"Manual override: switched to value={modeValue} ({modeName})");
+                Logger.Info($"Manual override: AC={acVal} ({acName}), DC={dcVal} ({dcName})");
             }
             else
             {

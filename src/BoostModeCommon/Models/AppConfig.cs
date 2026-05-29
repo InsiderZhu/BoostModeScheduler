@@ -7,8 +7,10 @@ public class AppConfig
     public int LoadHoldSeconds { get; set; } = 5;
     public int IdleHoldSeconds { get; set; } = 30;
     public int PollIntervalMs { get; set; } = 2000;
-    public int IdleModeValue { get; set; } = 3;
-    public int LoadModeValue { get; set; } = 1;
+    public int IdleModeValueAc { get; set; } = 3;
+    public int IdleModeValueDc { get; set; } = 3;
+    public int LoadModeValueAc { get; set; } = 1;
+    public int LoadModeValueDc { get; set; } = 1;
     public bool UseProcessDetection { get; set; } = true;
     public bool UseCpuDetection { get; set; } = true;
     public List<string> ProcessWhitelist { get; set; } = new()
@@ -30,7 +32,8 @@ public class AppConfig
 public class StatusInfo
 {
     public string CurrentMode { get; set; } = "Unknown";
-    public int CurrentModeValue { get; set; }
+    public int CurrentModeValueAc { get; set; }
+    public int CurrentModeValueDc { get; set; }
     public double CpuUsage { get; set; }
     public List<string> GameProcesses { get; set; } = new();
     public string? LastSwitchReason { get; set; }
