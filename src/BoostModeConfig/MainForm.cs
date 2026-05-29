@@ -29,9 +29,10 @@ public class MainForm : Form
     private Button btnApplyManual = null!;
     private Button btnSave = null!, btnRefresh = null!;
     private Button btnEditConfig = null!, btnOpenLogFolder = null!, btnViewLog = null!;
-    private CheckBox chkAutoStart = null!, chkCloseToTray = null!;
+    private CheckBox chkAutoStart = null!, chkCloseToTray = null!, chkEnableNotify = null!;
     private NotifyIcon trayIcon = null!;
     private bool _realClosing;
+    private DateTime _lastNotifiedSwitch = DateTime.MinValue;
 
     public MainForm()
     {
@@ -109,7 +110,7 @@ public class MainForm : Form
         int y = 12;
 
         // ─── Service Control ───
-        grpService = new GroupBox { Text = "服务控制", Top = y, Height = 96 };
+        grpService = new GroupBox { Text = "服务控制", Top = y, Height = 118 };
         lblServiceStatus = new Label { Text = "状态: 检测中...", Left = 12, Top = 22, Width = 300, Height = 20 };
         lblServiceStatus.Font = new Font(lblServiceStatus.Font, FontStyle.Bold);
         grpService.Controls.Add(lblServiceStatus);
@@ -143,8 +144,17 @@ public class MainForm : Form
         };
         grpService.Controls.Add(chkCloseToTray);
 
+        chkEnableNotify = new CheckBox { Text = "模式切换时显示通知", Left = 12, Top = 78, Width = 180, Height = 22 };
+        chkEnableNotify.Checked = _config.EnableSwitchNotification;
+        chkEnableNotify.CheckedChanged += (_, _) =>
+        {
+            _config.EnableSwitchNotification = chkEnableNotify.Checked;
+            ConfigManager.Save(_config);
+        };
+        grpService.Controls.Add(chkEnableNotify);
+
         Controls.Add(grpService);
-        y += 106;
+        y += 128;
 
         // ─── Current Status ───
         grpStatus = new GroupBox { Text = "当前状态", Top = y, Height = 110 };
@@ -406,6 +416,7 @@ public class MainForm : Form
         // ── Service checkboxes ──
         chkAutoStart.Left = 12;
         chkCloseToTray.Left = Math.Max(130, w - 280);
+        chkEnableNotify.Left = Math.Max(300, w - 80);
 
         // ── lblCpuUsage ──
         lblCpuUsage.Left = w - 360;
@@ -561,6 +572,20 @@ public class MainForm : Form
                 else
                 {
                     lblLastAutoSwitch.Text = "上次自动切换: 暂无";
+                }
+
+                // ─── Toast notification on new switch ───
+                if (_config.EnableSwitchNotification && latest.Time > _lastNotifiedSwitch && latest.Mode is "LOAD" or "IDLE" or "MANUAL")
+                {
+                    _lastNotifiedSwitch = latest.Time;
+                    string acName = _modeNames.GetValueOrDefault(latest.AcValue, latest.AcValue.ToString());
+                    string dcName = _modeNames.GetValueOrDefault(latest.DcValue, latest.DcValue.ToString());
+                    string title = $"BoostMode: {modeLabel}";
+                    string body = $"AC={acName}  DC={dcName}\n{latest.Reason}";
+                    trayIcon.BalloonTipTitle = title;
+                    trayIcon.BalloonTipText = body;
+                    trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                    trayIcon.ShowBalloonTip(5000);
                 }
             }
             else

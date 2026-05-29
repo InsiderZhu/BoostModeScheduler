@@ -28,6 +28,7 @@ public class AppConfig
         "r5apex.exe"
     };
     public bool CloseToTray { get; set; } = true;
+    public bool EnableSwitchNotification { get; set; } = true;
 }
 
 public class StatusInfo
