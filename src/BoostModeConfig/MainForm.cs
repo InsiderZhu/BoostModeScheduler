@@ -29,6 +29,9 @@ public class MainForm : Form
     private Button btnApplyManual = null!;
     private Button btnSave = null!, btnRefresh = null!;
     private Button btnEditConfig = null!, btnOpenLogFolder = null!, btnViewLog = null!;
+    private CheckBox chkAutoStart = null!, chkCloseToTray = null!;
+    private NotifyIcon trayIcon = null!;
+    private bool _realClosing;
 
     public MainForm()
     {
@@ -48,6 +51,37 @@ public class MainForm : Form
         _refreshTimer.Start();
 
         RefreshStatus();
+
+        // ─── Tray Icon ───
+        trayIcon = new NotifyIcon
+        {
+            Icon = Icon,
+            Text = "BoostModeScheduler",
+            Visible = true
+        };
+        trayIcon.DoubleClick += (_, _) => { Show(); WindowState = FormWindowState.Normal; Activate(); };
+        var trayMenu = new ContextMenuStrip();
+        trayMenu.Items.Add("显示窗口", null, (_, _) => { Show(); WindowState = FormWindowState.Normal; Activate(); });
+        trayMenu.Items.Add("退出", null, (_, _) => { _realClosing = true; Close(); });
+        trayIcon.ContextMenuStrip = trayMenu;
+
+        Resize += (_, _) =>
+        {
+            if (_config.CloseToTray && WindowState == FormWindowState.Minimized)
+                Hide();
+        };
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (_config.CloseToTray && !_realClosing && e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+        trayIcon?.Dispose();
+        base.OnFormClosing(e);
     }
 
     private Dictionary<int, string> LoadModeNames()
@@ -75,7 +109,7 @@ public class MainForm : Form
         int y = 12;
 
         // ─── Service Control ───
-        grpService = new GroupBox { Text = "服务控制", Top = y, Height = 70 };
+        grpService = new GroupBox { Text = "服务控制", Top = y, Height = 96 };
         lblServiceStatus = new Label { Text = "状态: 检测中...", Left = 12, Top = 22, Width = 300, Height = 20 };
         lblServiceStatus.Font = new Font(lblServiceStatus.Font, FontStyle.Bold);
         grpService.Controls.Add(lblServiceStatus);
@@ -91,8 +125,26 @@ public class MainForm : Form
         btnRestart = new Button { Text = "重启", Top = 18, Width = 70, Height = 28 };
         btnRestart.Click += (_, _) => ControlService("restart");
         grpService.Controls.Add(btnRestart);
+
+        chkAutoStart = new CheckBox { Text = "开机自启", Left = 12, Top = 52, Width = 120, Height = 22 };
+        chkAutoStart.CheckedChanged += (_, _) =>
+        {
+            try { SetServiceAutoStart(chkAutoStart.Checked); }
+            catch (Exception ex) { ShowError($"设置失败: {ex.Message}"); chkAutoStart.Checked = !chkAutoStart.Checked; }
+        };
+        grpService.Controls.Add(chkAutoStart);
+
+        chkCloseToTray = new CheckBox { Text = "关闭时最小化到托盘", Left = 140, Top = 52, Width = 180, Height = 22 };
+        chkCloseToTray.Checked = _config.CloseToTray;
+        chkCloseToTray.CheckedChanged += (_, _) =>
+        {
+            _config.CloseToTray = chkCloseToTray.Checked;
+            ConfigManager.Save(_config);
+        };
+        grpService.Controls.Add(chkCloseToTray);
+
         Controls.Add(grpService);
-        y += 80;
+        y += 106;
 
         // ─── Current Status ───
         grpStatus = new GroupBox { Text = "当前状态", Top = y, Height = 110 };
@@ -351,6 +403,10 @@ public class MainForm : Form
         btnStop.Left = w - 244;
         btnRestart.Left = w - 168;
 
+        // ── Service checkboxes ──
+        chkAutoStart.Left = 12;
+        chkCloseToTray.Left = Math.Max(130, w - 280);
+
         // ── lblCpuUsage ──
         lblCpuUsage.Left = w - 360;
 
@@ -447,6 +503,15 @@ public class MainForm : Form
             lblServiceStatus.ForeColor = status == ServiceControllerStatus.Running ? Color.Green : Color.Red;
             btnStart.Enabled = status != ServiceControllerStatus.Running;
             btnStop.Enabled = status == ServiceControllerStatus.Running;
+
+            bool autoStart = IsServiceAutoStart();
+            chkAutoStart.CheckedChanged -= (_, _) => { };
+            chkAutoStart.Checked = autoStart;
+            chkAutoStart.CheckedChanged += (_, _) =>
+            {
+                try { SetServiceAutoStart(chkAutoStart.Checked); }
+                catch (Exception ex) { ShowError($"设置失败: {ex.Message}"); chkAutoStart.Checked = !chkAutoStart.Checked; }
+            };
         }
         catch (InvalidOperationException)
         {
@@ -714,12 +779,43 @@ public class MainForm : Form
             {
                 ShowError($"切换失败: {output}");
             }
-            RefreshStatus();
+        RefreshStatus();
         }
         catch (Exception ex)
         {
             ShowError($"切换失败: {ex.Message}");
         }
+    }
+
+    private static bool IsServiceAutoStart()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("sc.exe", "qc BoostModeSvc")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var p = Process.Start(psi)!;
+            var output = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(3000);
+            return output.Contains("AUTO_START");
+        }
+        catch { return false; }
+    }
+
+    private static void SetServiceAutoStart(bool enable)
+    {
+        var mode = enable ? "auto" : "demand";
+        var psi = new ProcessStartInfo("sc.exe", $"config BoostModeSvc start={mode}")
+        {
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        using var p = Process.Start(psi)!;
+        p.WaitForExit(5000);
     }
 
     private void ShowLogViewer()

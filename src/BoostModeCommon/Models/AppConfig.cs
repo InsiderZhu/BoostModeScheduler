@@ -27,6 +27,7 @@ public class AppConfig
         "wow.exe",
         "r5apex.exe"
     };
+    public bool CloseToTray { get; set; } = true;
 }
 
 public class StatusInfo
