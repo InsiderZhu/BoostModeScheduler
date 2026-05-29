@@ -285,7 +285,7 @@ public class MainForm : Form
         grpWhitelist.Width = w - halfW - 12;
 
         // ── grpSettings internal ──
-        int labelWidth = Math.Max(90, halfW - 128);
+        int labelWidth = Math.Max(110, halfW - 128);
         foreach (Control c in grpSettings.Controls)
         {
             if (c is Label lbl && lbl.Left == 8 && lbl.Top >= 20 && lbl.Top <= 145)
@@ -295,12 +295,12 @@ public class MainForm : Form
             }
             else if (c is NumericUpDown nud && nud.Top >= 20 && nud.Top <= 145)
             {
-                nud.Left = halfW - 96;
+                nud.Left = halfW - 86;
             }
             else if (c is Label unit && unit.Top >= 23 && unit.Top <= 145 && (unit.Text == "%" || unit.Text == "秒" || unit.Text == "毫秒"))
             {
-                unit.Left = halfW - 28;
-                unit.Width = 24;
+                unit.Left = halfW - 24;
+                unit.Width = 18;
                 unit.TextAlign = ContentAlignment.MiddleLeft;
             }
             else if (c is ComboBox)
