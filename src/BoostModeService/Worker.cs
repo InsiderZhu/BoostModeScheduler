@@ -17,6 +17,7 @@ public class Worker : BackgroundService
     private int _currentAcValue = -1;
     private int _currentDcValue = -1;
     private string _lastSwitchReason = "";
+    private DateTime _lastAutoSwitchTime = DateTime.MinValue;
     private readonly DateTime _startTime = DateTime.Now;
 
     public Worker(PowerModeSwitcher powerSwitcher, CpuMonitor cpuMonitor)
@@ -75,6 +76,7 @@ public class Worker : BackgroundService
                         _currentAcValue = targetAc;
                         _currentDcValue = targetDc;
                         _lastSwitchReason = reason;
+                        _lastAutoSwitchTime = DateTime.Now;
                         Logger.Info($"SWITCH: -> {(shouldBeLoad ? "LOAD" : "IDLE")} (AC={targetAc}, DC={targetDc})");
                         Logger.Info($"  Reason: {reason}");
                         Logger.Info($"  Result: {output}");
@@ -132,6 +134,7 @@ public class Worker : BackgroundService
             CpuUsage = Math.Round(cpu, 1),
             GameProcesses = gameProcesses,
             LastSwitchReason = _lastSwitchReason,
+            LastAutoSwitchTime = _lastAutoSwitchTime,
             ServiceStartTime = _startTime,
             LastUpdateTime = DateTime.Now
         };

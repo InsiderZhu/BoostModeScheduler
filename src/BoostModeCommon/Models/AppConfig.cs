@@ -37,6 +37,7 @@ public class StatusInfo
     public double CpuUsage { get; set; }
     public List<string> GameProcesses { get; set; } = new();
     public string? LastSwitchReason { get; set; }
+    public DateTime LastAutoSwitchTime { get; set; }
     public DateTime ServiceStartTime { get; set; }
     public DateTime LastUpdateTime { get; set; }
 }

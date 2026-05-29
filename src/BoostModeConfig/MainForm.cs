@@ -16,7 +16,7 @@ public class MainForm : Form
     private GroupBox grpWhitelist = null!, grpOverride = null!, grpLog = null!;
     private GroupBox grpSwitchLog = null!;
     private Label lblServiceStatus = null!, lblCurrentMode = null!, lblCpuUsage = null!;
-    private Label lblGameProcesses = null!, lblLastSwitch = null!;
+    private Label lblGameProcesses = null!, lblLastSwitch = null!, lblLastAutoSwitch = null!;
     private Button btnStart = null!, btnStop = null!, btnRestart = null!;
     private NumericUpDown numLoadThreshold = null!, numIdleThreshold = null!;
     private NumericUpDown numPollInterval = null!, numLoadHold = null!, numIdleHold = null!;
@@ -95,7 +95,7 @@ public class MainForm : Form
         y += 80;
 
         // ─── Current Status ───
-        grpStatus = new GroupBox { Text = "当前状态", Top = y, Height = 90 };
+        grpStatus = new GroupBox { Text = "当前状态", Top = y, Height = 110 };
         lblCurrentMode = new Label { Text = "当前模式: --", Left = 12, Top = 22, Width = 300, Height = 18 };
         lblCurrentMode.Font = new Font(lblCurrentMode.Font, FontStyle.Bold);
         grpStatus.Controls.Add(lblCurrentMode);
@@ -108,8 +108,11 @@ public class MainForm : Form
 
         lblLastSwitch = new Label { Text = "上次切换原因: --", Left = 12, Top = 64, Width = 610, Height = 18, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
         grpStatus.Controls.Add(lblLastSwitch);
+
+        lblLastAutoSwitch = new Label { Text = "上次自动切换: --", Left = 12, Top = 84, Width = 610, Height = 18, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        grpStatus.Controls.Add(lblLastAutoSwitch);
         Controls.Add(grpStatus);
-        y += 100;
+        y += 120;
 
         // ─── Settings ───
         grpSettings = new GroupBox { Text = "检测设置", Top = y, Height = 250 };
@@ -466,7 +469,6 @@ public class MainForm : Form
                 lblCurrentMode.Text = $"当前模式: {statusInfo.CurrentMode} (AC={acName}, DC={dcName})";
                 lblCpuUsage.Text = $"CPU 占用: {statusInfo.CpuUsage:F1}%";
                 lblGameProcesses.Text = $"检测到游戏进程: {(statusInfo.GameProcesses.Count > 0 ? string.Join(", ", statusInfo.GameProcesses) : "无")}";
-                lblLastSwitch.Text = $"上次切换原因: {statusInfo.LastSwitchReason ?? "--"}";
             }
         }
         catch
@@ -475,18 +477,83 @@ public class MainForm : Form
             lblCpuUsage.Text = "CPU 占用: --";
         }
 
+        try
+        {
+            var entries = ParseSwitchLogs();
+            if (entries.Count > 0)
+            {
+                var latest = entries[0];
+                string modeLabel = latest.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", _ => latest.Mode };
+                lblLastSwitch.Text = $"上次切换原因: [{latest.Time:HH:mm:ss}] {modeLabel}  {latest.Reason}";
+
+                var lastAuto = entries.FirstOrDefault(e => e.Mode is "LOAD" or "IDLE");
+                if (lastAuto.Mode != null)
+                {
+                    string autoLabel = lastAuto.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", _ => lastAuto.Mode };
+                    lblLastAutoSwitch.Text = $"上次自动切换: [{lastAuto.Time:HH:mm:ss}] {autoLabel}  {lastAuto.Reason}";
+                }
+                else
+                {
+                    lblLastAutoSwitch.Text = "上次自动切换: 暂无";
+                }
+            }
+            else
+            {
+                lblLastSwitch.Text = "上次切换原因: 暂无记录";
+                lblLastAutoSwitch.Text = "上次自动切换: 暂无";
+            }
+        }
+        catch
+        {
+            lblLastSwitch.Text = "上次切换原因: --";
+            lblLastAutoSwitch.Text = "上次自动切换: --";
+        }
+
         RefreshSwitchLog();
     }
 
     private void RefreshSwitchLog()
     {
+        var entries = ParseSwitchLogs();
+        if (entries.Count == 0)
+        {
+            txtSwitchLog.Text = "暂无切换记录";
+            return;
+        }
+
+        var modeNames = _modeNames;
+        var lines = entries.Select(e =>
+        {
+            string acName = modeNames.GetValueOrDefault(e.AcValue, e.AcValue.ToString());
+            string dcName = modeNames.GetValueOrDefault(e.DcValue, e.DcValue.ToString());
+            string modeLabel = e.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", _ => e.Mode };
+            string entry = $"[{e.Time:HH:mm:ss}]  {modeLabel}  AC={acName}  DC={dcName}";
+            if (!string.IsNullOrEmpty(e.Reason)) entry += $"  原因: {e.Reason}";
+            return entry;
+        });
+
+        txtSwitchLog.Text = string.Join(Environment.NewLine, lines);
+    }
+
+    private struct SwitchEntry
+    {
+        public DateTime Time;
+        public string Mode;
+        public int AcValue;
+        public int DcValue;
+        public string Reason;
+    }
+
+    private List<SwitchEntry> ParseSwitchLogs()
+    {
+        var result = new List<SwitchEntry>();
         try
         {
             var logDir = ConfigManager.GetLogDir();
-            if (!Directory.Exists(logDir)) { txtSwitchLog.Text = "暂无切换记录"; return; }
+            if (!Directory.Exists(logDir)) return result;
 
             var logFiles = Directory.GetFiles(logDir, "*.log").OrderByDescending(f => f).Take(5).ToArray();
-            if (logFiles.Length == 0) { txtSwitchLog.Text = "暂无切换记录"; return; }
+            if (logFiles.Length == 0) return result;
 
             var lines = new List<string>();
             foreach (var file in logFiles)
@@ -495,14 +562,12 @@ public class MainForm : Form
                 catch { }
             }
 
-            var modeNames = _modeNames;
-            var entries = new List<string>();
             for (int i = 0; i < lines.Count; i++)
             {
                 var line = lines[i];
                 if (!line.Contains("SWITCH:")) continue;
 
-                var tsMatch = System.Text.RegularExpressions.Regex.Match(line, @"(\d{2}:\d{2}:\d{2})");
+                var tsMatch = System.Text.RegularExpressions.Regex.Match(line, @"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}|\d{2}:\d{2}:\d{2})");
                 string ts = tsMatch.Success ? tsMatch.Groups[1].Value : "";
 
                 var swMatch = System.Text.RegularExpressions.Regex.Match(line, @"-> (\w+) \(AC=(\d+), DC=(\d+)\)");
@@ -511,10 +576,6 @@ public class MainForm : Form
                 int acVal = int.Parse(swMatch.Groups[2].Value);
                 int dcVal = int.Parse(swMatch.Groups[3].Value);
 
-                string acName = modeNames.GetValueOrDefault(acVal, acVal.ToString());
-                string dcName = modeNames.GetValueOrDefault(dcVal, dcVal.ToString());
-                string modeLabel = mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", _ => mode };
-
                 string reason = "";
                 if (i + 1 < lines.Count)
                 {
@@ -522,27 +583,15 @@ public class MainForm : Form
                     if (rMatch.Success) reason = rMatch.Groups[1].Value;
                 }
 
-                string result = "";
-                if (i + 2 < lines.Count)
-                {
-                    var rMatch2 = System.Text.RegularExpressions.Regex.Match(lines[i + 2], @"Result: (.+)");
-                    if (rMatch2.Success) result = rMatch2.Groups[1].Value;
-                }
+                DateTime.TryParse(ts, out DateTime time);
 
-                string entry = $"[{ts}]  {modeLabel}  AC={acName}  DC={dcName}";
-                if (!string.IsNullOrEmpty(reason)) entry += $"  原因: {reason}";
-                entries.Add(entry);
+                result.Add(new SwitchEntry { Time = time, Mode = mode, AcValue = acVal, DcValue = dcVal, Reason = reason });
             }
+        }
+        catch { }
 
-            entries.Reverse();
-            txtSwitchLog.Text = entries.Count > 0
-                ? string.Join(Environment.NewLine, entries)
-                : "暂无切换记录";
-        }
-        catch
-        {
-            // silent
-        }
+        result.Reverse();
+        return result;
     }
 
     private void SaveAndRestart()
