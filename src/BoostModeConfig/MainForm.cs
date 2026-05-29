@@ -14,6 +14,7 @@ public class MainForm : Form
 
     private GroupBox grpService = null!, grpStatus = null!, grpSettings = null!;
     private GroupBox grpWhitelist = null!, grpOverride = null!, grpLog = null!;
+    private GroupBox grpSwitchLog = null!;
     private Label lblServiceStatus = null!, lblCurrentMode = null!, lblCpuUsage = null!;
     private Label lblGameProcesses = null!, lblLastSwitch = null!;
     private Button btnStart = null!, btnStop = null!, btnRestart = null!;
@@ -22,7 +23,7 @@ public class MainForm : Form
     private ComboBox cmbIdleModeAc = null!, cmbIdleModeDc = null!;
     private ComboBox cmbLoadModeAc = null!, cmbLoadModeDc = null!;
     private ListBox lstProcesses = null!;
-    private TextBox txtNewProcess = null!;
+    private TextBox txtNewProcess = null!, txtSwitchLog = null!;
     private Button btnAdd = null!, btnRemove = null!;
     private ComboBox cmbManualAc = null!, cmbManualDc = null!;
     private Button btnApplyManual = null!;
@@ -116,22 +117,27 @@ public class MainForm : Form
         AddLabeledControl(grpSettings, "CPU 负载阈值 (≥此值切负载):", 8, 22);
         numLoadThreshold = new NumericUpDown { Top = 20, Width = 65, Minimum = 1, Maximum = 100, Value = _config.CpuLoadThreshold };
         grpSettings.Controls.Add(numLoadThreshold);
+        new Label { Text = "%", Top = 23, Height = 18 }.Let(l => grpSettings.Controls.Add(l));
 
         AddLabeledControl(grpSettings, "CPU 空闲阈值 (<此值切空闲):", 8, 52);
         numIdleThreshold = new NumericUpDown { Top = 50, Width = 65, Minimum = 0, Maximum = 100, Value = _config.CpuIdleThreshold };
         grpSettings.Controls.Add(numIdleThreshold);
+        new Label { Text = "%", Top = 53, Height = 18 }.Let(l => grpSettings.Controls.Add(l));
 
         AddLabeledControl(grpSettings, "升载确认时间:", 8, 82);
         numLoadHold = new NumericUpDown { Top = 80, Width = 65, Minimum = 1, Maximum = 120, Value = _config.LoadHoldSeconds };
         grpSettings.Controls.Add(numLoadHold);
+        new Label { Text = "秒", Top = 83, Height = 18 }.Let(l => grpSettings.Controls.Add(l));
 
         AddLabeledControl(grpSettings, "降载确认时间:", 8, 112);
         numIdleHold = new NumericUpDown { Top = 110, Width = 65, Minimum = 1, Maximum = 300, Value = _config.IdleHoldSeconds };
         grpSettings.Controls.Add(numIdleHold);
+        new Label { Text = "秒", Top = 113, Height = 18 }.Let(l => grpSettings.Controls.Add(l));
 
         AddLabeledControl(grpSettings, "轮询间隔:", 8, 142);
         numPollInterval = new NumericUpDown { Top = 140, Width = 65, Minimum = 500, Maximum = 30000, Increment = 500, Value = _config.PollIntervalMs };
         grpSettings.Controls.Add(numPollInterval);
+        new Label { Text = "毫秒", Top = 143, Height = 18 }.Let(l => grpSettings.Controls.Add(l));
 
         // AC/DC column headers
         new Label { Text = "AC", Width = 60, Height = 18, Font = new Font(Font, FontStyle.Underline), TextAlign = ContentAlignment.MiddleCenter }.Let(l => grpSettings.Controls.Add(l));
@@ -217,16 +223,24 @@ public class MainForm : Form
         };
         grpLog.Controls.Add(btnOpenLogFolder);
 
-        var btnMiniLog = new Button { Text = "切换记录", Left = 140, Top = 18, Width = 120, Height = 28 };
-        btnMiniLog.Click += (_, _) => ShowMiniLogViewer();
-        grpLog.Controls.Add(btnMiniLog);
-
         btnViewLog = new Button { Text = "查看完整日志", Left = 268, Top = 18, Width = 150, Height = 28 };
         btnViewLog.Click += (_, _) => ShowLogViewer();
         grpLog.Controls.Add(btnViewLog);
 
         Controls.Add(grpLog);
         y += 66;
+
+        // ─── Switch Log (inline) ───
+        grpSwitchLog = new GroupBox { Text = "切换记录", Top = y, Height = 120 };
+        txtSwitchLog = new TextBox
+        {
+            Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+            WordWrap = true, Font = new Font("Microsoft YaHei", 9),
+            Text = "暂无切换记录"
+        };
+        grpSwitchLog.Controls.Add(txtSwitchLog);
+        Controls.Add(grpSwitchLog);
+        y += 130;
 
         // ─── Bottom Buttons ───
         btnEditConfig = new Button { Text = "用记事本编辑 config", Top = y, Width = 150, Height = 36 };
@@ -258,7 +272,7 @@ public class MainForm : Form
         int rightX = x + halfW + 12;
 
         // Full-width groupboxes
-        foreach (var g in new[] { grpService, grpStatus, grpOverride, grpLog })
+        foreach (var g in new[] { grpService, grpStatus, grpOverride, grpLog, grpSwitchLog })
         {
             if (g != null) { g.Left = x; g.Width = w; }
         }
@@ -271,7 +285,7 @@ public class MainForm : Form
         grpWhitelist.Width = w - halfW - 12;
 
         // ── grpSettings internal ──
-        int upDownLeft = halfW - 100;
+        int upDownLeft = halfW - 90;
         int labelWidth = halfW - 110;
         foreach (Control c in grpSettings.Controls)
         {
@@ -283,6 +297,12 @@ public class MainForm : Form
             else if (c is NumericUpDown nud && nud.Top >= 20 && nud.Top <= 145)
             {
                 nud.Left = halfW - 90;
+            }
+            else if (c is Label unit && unit.Top >= 23 && unit.Top <= 145 && (unit.Text == "%" || unit.Text == "秒" || unit.Text == "毫秒"))
+            {
+                unit.Left = halfW - 20;
+                unit.Width = 30;
+                unit.TextAlign = ContentAlignment.MiddleLeft;
             }
             else if (c is ComboBox)
             {
@@ -330,6 +350,12 @@ public class MainForm : Form
 
         // ── lblCpuUsage ──
         lblCpuUsage.Left = w - 360;
+
+        // ── grpSwitchLog internal ──
+        txtSwitchLog.Left = 8;
+        txtSwitchLog.Top = 18;
+        txtSwitchLog.Width = grpSwitchLog.ClientSize.Width - 16;
+        txtSwitchLog.Height = grpSwitchLog.ClientSize.Height - 28;
 
         // ── Manual override ──
         int overrideWidth = grpOverride.ClientSize.Width;
@@ -448,6 +474,75 @@ public class MainForm : Form
             lblCurrentMode.Text = "当前模式: 读取失败";
             lblCpuUsage.Text = "CPU 占用: --";
         }
+
+        RefreshSwitchLog();
+    }
+
+    private void RefreshSwitchLog()
+    {
+        try
+        {
+            var logDir = ConfigManager.GetLogDir();
+            if (!Directory.Exists(logDir)) { txtSwitchLog.Text = "暂无切换记录"; return; }
+
+            var logFiles = Directory.GetFiles(logDir, "*.log").OrderByDescending(f => f).Take(5).ToArray();
+            if (logFiles.Length == 0) { txtSwitchLog.Text = "暂无切换记录"; return; }
+
+            var lines = new List<string>();
+            foreach (var file in logFiles)
+            {
+                try { lines.AddRange(File.ReadAllLines(file)); }
+                catch { }
+            }
+
+            var modeNames = _modeNames;
+            var entries = new List<string>();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                if (!line.Contains("SWITCH:")) continue;
+
+                var tsMatch = System.Text.RegularExpressions.Regex.Match(line, @"(\d{2}:\d{2}:\d{2})");
+                string ts = tsMatch.Success ? tsMatch.Groups[1].Value : "";
+
+                var swMatch = System.Text.RegularExpressions.Regex.Match(line, @"-> (\w+) \(AC=(\d+), DC=(\d+)\)");
+                if (!swMatch.Success) continue;
+                string mode = swMatch.Groups[1].Value;
+                int acVal = int.Parse(swMatch.Groups[2].Value);
+                int dcVal = int.Parse(swMatch.Groups[3].Value);
+
+                string acName = modeNames.GetValueOrDefault(acVal, acVal.ToString());
+                string dcName = modeNames.GetValueOrDefault(dcVal, dcVal.ToString());
+                string modeLabel = mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", _ => mode };
+
+                string reason = "";
+                if (i + 1 < lines.Count)
+                {
+                    var rMatch = System.Text.RegularExpressions.Regex.Match(lines[i + 1], @"Reason: (.+)");
+                    if (rMatch.Success) reason = rMatch.Groups[1].Value;
+                }
+
+                string result = "";
+                if (i + 2 < lines.Count)
+                {
+                    var rMatch2 = System.Text.RegularExpressions.Regex.Match(lines[i + 2], @"Result: (.+)");
+                    if (rMatch2.Success) result = rMatch2.Groups[1].Value;
+                }
+
+                string entry = $"[{ts}]  {modeLabel}  AC={acName}  DC={dcName}";
+                if (!string.IsNullOrEmpty(reason)) entry += $"  原因: {reason}";
+                entries.Add(entry);
+            }
+
+            entries.Reverse();
+            txtSwitchLog.Text = entries.Count > 0
+                ? string.Join(Environment.NewLine, entries)
+                : "暂无切换记录";
+        }
+        catch
+        {
+            // silent
+        }
     }
 
     private void SaveAndRestart()
@@ -541,7 +636,9 @@ public class MainForm : Form
             {
                 MessageBox.Show($"已强制切换\nAC={acName}\nDC={dcName}\n\n结果: {output}",
                     "手动切换", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                Logger.Info($"Manual override: AC={acVal} ({acName}), DC={dcVal} ({dcName})");
+                Logger.Info($"SWITCH: -> MANUAL (AC={acVal}, DC={dcVal})");
+                Logger.Info($"  Reason: 用户手动切换");
+                Logger.Info($"  Result: {output}");
             }
             else
             {
@@ -604,115 +701,6 @@ public class MainForm : Form
             Font = new Font("Consolas", 10),
             Dock = DockStyle.Fill,
             Text = logContent.ToString()
-        };
-        viewer.Controls.Add(textBox);
-
-        var closeBtn = new Button
-        {
-            Text = "关闭",
-            Dock = DockStyle.Bottom,
-            Height = 36
-        };
-        closeBtn.Click += (_, _) => viewer.Close();
-        viewer.Controls.Add(closeBtn);
-
-        viewer.ShowDialog();
-    }
-
-    private void ShowMiniLogViewer()
-    {
-        var logDir = ConfigManager.GetLogDir();
-        if (!Directory.Exists(logDir))
-        {
-            ShowError("日志目录不存在，服务可能尚未写日志");
-            return;
-        }
-
-        var logFiles = Directory.GetFiles(logDir, "*.log").OrderByDescending(f => f).Take(5).ToArray();
-        if (logFiles.Length == 0)
-        {
-            ShowError("没有找到日志文件");
-            return;
-        }
-
-        var lines = new List<string>();
-        foreach (var file in logFiles)
-        {
-            try { lines.AddRange(File.ReadAllLines(file)); }
-            catch { }
-        }
-
-        // Parse switch entries
-        var modeNames = _modeNames;
-        var entries = new List<string>();
-        for (int i = 0; i < lines.Count; i++)
-        {
-            var line = lines[i];
-            if (!line.Contains("SWITCH:")) continue;
-
-            // Parse timestamp
-            var tsMatch = System.Text.RegularExpressions.Regex.Match(line, @"(\d{2}:\d{2}:\d{2})");
-            string ts = tsMatch.Success ? tsMatch.Groups[1].Value : "";
-
-            // Parse mode and values
-            var swMatch = System.Text.RegularExpressions.Regex.Match(line, @"-> (\w+) \(AC=(\d+), DC=(\d+)\)");
-            if (!swMatch.Success) continue;
-            string mode = swMatch.Groups[1].Value;
-            int acVal = int.Parse(swMatch.Groups[2].Value);
-            int dcVal = int.Parse(swMatch.Groups[3].Value);
-
-            string acName = modeNames.GetValueOrDefault(acVal, acVal.ToString());
-            string dcName = modeNames.GetValueOrDefault(dcVal, dcVal.ToString());
-            string modeLabel = mode == "LOAD" ? "负载模式" : "空闲模式";
-
-            // Look ahead for Reason line
-            string reason = "";
-            if (i + 1 < lines.Count)
-            {
-                var rMatch = System.Text.RegularExpressions.Regex.Match(lines[i + 1], @"Reason: (.+)");
-                if (rMatch.Success)
-                    reason = rMatch.Groups[1].Value;
-            }
-
-            // Look ahead for Result line
-            string result = "";
-            if (i + 2 < lines.Count)
-            {
-                var rMatch2 = System.Text.RegularExpressions.Regex.Match(lines[i + 2], @"Result: (.+)");
-                if (rMatch2.Success)
-                    result = rMatch2.Groups[1].Value;
-            }
-
-            string entry = $"[{ts}] → {modeLabel} (AC={acName}, DC={dcName})";
-            if (!string.IsNullOrEmpty(reason))
-                entry += $"  原因: {reason}";
-            if (!string.IsNullOrEmpty(result))
-                entry += $"  [{result}]";
-            entries.Add(entry);
-        }
-
-        entries.Reverse();
-
-        var viewer = new Form
-        {
-            Text = "切换记录",
-            Size = new Size(700, 350),
-            StartPosition = FormStartPosition.CenterParent,
-            MinimizeBox = false,
-            MaximizeBox = false
-        };
-
-        var textBox = new TextBox
-        {
-            Multiline = true,
-            ReadOnly = true,
-            ScrollBars = ScrollBars.Vertical,
-            WordWrap = true,
-            Font = new Font("Microsoft YaHei", 10),
-            Dock = DockStyle.Fill,
-            Text = entries.Count > 0
-                ? string.Join(Environment.NewLine, entries)
-                : "暂无切换记录"
         };
         viewer.Controls.Add(textBox);
 
