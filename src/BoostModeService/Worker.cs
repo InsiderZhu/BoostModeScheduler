@@ -31,7 +31,8 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Logger.Info("========================================");
-        Logger.Info("BoostModeSvc starting...");
+        Logger.Info("SWITCH: -> SERVICE START");
+        Logger.Info("  Reason: 服务启动");
 
         _config = ConfigManager.Load();
 
@@ -96,6 +97,8 @@ public class Worker : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        Logger.Info("SWITCH: -> SERVICE STOP");
+        Logger.Info("  Reason: 服务停止");
         Logger.Info("BoostModeSvc shutting down...");
         await base.StopAsync(cancellationToken);
     }

@@ -484,7 +484,7 @@ public class MainForm : Form
             if (entries.Count > 0)
             {
                 var latest = entries[0];
-                string modeLabel = latest.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", _ => latest.Mode };
+                string modeLabel = latest.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", "SERVICE" => "服务事件", _ => latest.Mode };
                 lblLastSwitch.Text = $"上次切换原因: [{latest.Time:HH:mm:ss}] {modeLabel}  {latest.Reason}";
 
                 var lastAuto = entries.FirstOrDefault(e => e.Mode is "LOAD" or "IDLE");
@@ -525,11 +525,20 @@ public class MainForm : Form
         var modeNames = _modeNames;
         var lines = entries.Select(e =>
         {
-            string acName = modeNames.GetValueOrDefault(e.AcValue, e.AcValue.ToString());
-            string dcName = modeNames.GetValueOrDefault(e.DcValue, e.DcValue.ToString());
-            string modeLabel = e.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", _ => e.Mode };
-            string entry = $"[{e.Time:HH:mm:ss}]  {modeLabel}  AC={acName}  DC={dcName}";
-            if (!string.IsNullOrEmpty(e.Reason)) entry += $"  原因: {e.Reason}";
+            string modeLabel = e.Mode switch { "LOAD" => "负载模式", "IDLE" => "空闲模式", "MANUAL" => "手动切换", "SERVICE" => "服务事件", _ => e.Mode };
+            string entry;
+            if (e.Mode == "SERVICE")
+            {
+                entry = $"[{e.Time:HH:mm:ss}]  {modeLabel}";
+                if (!string.IsNullOrEmpty(e.Reason)) entry += $"  原因: {e.Reason}";
+            }
+            else
+            {
+                string acName = modeNames.GetValueOrDefault(e.AcValue, e.AcValue.ToString());
+                string dcName = modeNames.GetValueOrDefault(e.DcValue, e.DcValue.ToString());
+                entry = $"[{e.Time:HH:mm:ss}]  {modeLabel}  AC={acName}  DC={dcName}";
+                if (!string.IsNullOrEmpty(e.Reason)) entry += $"  原因: {e.Reason}";
+            }
             return entry;
         });
 
@@ -571,11 +580,14 @@ public class MainForm : Form
                 var tsMatch = System.Text.RegularExpressions.Regex.Match(line, @"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}|\d{2}:\d{2}:\d{2})");
                 string ts = tsMatch.Success ? tsMatch.Groups[1].Value : "";
 
-                var swMatch = System.Text.RegularExpressions.Regex.Match(line, @"-> (\w+) \(AC=(\d+), DC=(\d+)\)");
+                var swMatch = System.Text.RegularExpressions.Regex.Match(line, @"-> (\w+)(?: \(AC=(\d+), DC=(\d+)\))?");
                 if (!swMatch.Success) continue;
                 string mode = swMatch.Groups[1].Value;
-                int acVal = int.Parse(swMatch.Groups[2].Value);
-                int dcVal = int.Parse(swMatch.Groups[3].Value);
+                int acVal = 0, dcVal = 0;
+                if (swMatch.Groups[2].Success)
+                    int.TryParse(swMatch.Groups[2].Value, out acVal);
+                if (swMatch.Groups[3].Success)
+                    int.TryParse(swMatch.Groups[3].Value, out dcVal);
 
                 string reason = "";
                 if (i + 1 < lines.Count)
@@ -634,24 +646,32 @@ public class MainForm : Form
             switch (action)
             {
                 case "start":
+                    _service.Refresh();
+                    Logger.Info("SWITCH: -> SERVICE START");
+                    Logger.Info("  Reason: 用户在配置工具手动启动");
                     _service.Start();
                     _service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
-                    Logger.Info("Service started manually via config tool");
                     break;
                 case "stop":
+                    _service.Refresh();
+                    Logger.Info("SWITCH: -> SERVICE STOP");
+                    Logger.Info("  Reason: 用户在配置工具手动停止");
                     _service.Stop();
                     _service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
-                    Logger.Info("Service stopped manually via config tool");
                     break;
                 case "restart":
+                    _service.Refresh();
+                    Logger.Info("SWITCH: -> SERVICE STOP");
+                    Logger.Info("  Reason: 配置工具准备重启服务");
                     if (_service.Status == ServiceControllerStatus.Running)
                     {
                         _service.Stop();
                         _service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
                     }
+                    Logger.Info("SWITCH: -> SERVICE START");
+                    Logger.Info("  Reason: 配置工具重启服务");
                     _service.Start();
                     _service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
-                    Logger.Info("Service restarted via config tool");
                     break;
             }
         }
