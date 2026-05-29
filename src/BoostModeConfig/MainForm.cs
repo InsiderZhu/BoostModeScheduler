@@ -285,23 +285,22 @@ public class MainForm : Form
         grpWhitelist.Width = w - halfW - 12;
 
         // ── grpSettings internal ──
-        int upDownLeft = halfW - 90;
-        int labelWidth = halfW - 110;
+        int labelWidth = Math.Max(90, halfW - 128);
         foreach (Control c in grpSettings.Controls)
         {
-            if (c is Label lbl && lbl.Left == 8 && lbl.Width == 200)
+            if (c is Label lbl && lbl.Left == 8 && lbl.Top >= 20 && lbl.Top <= 145)
             {
-                c.Left = 8;
-                c.Width = Math.Max(labelWidth, 80);
+                lbl.Left = 8;
+                lbl.Width = labelWidth;
             }
             else if (c is NumericUpDown nud && nud.Top >= 20 && nud.Top <= 145)
             {
-                nud.Left = halfW - 90;
+                nud.Left = halfW - 96;
             }
             else if (c is Label unit && unit.Top >= 23 && unit.Top <= 145 && (unit.Text == "%" || unit.Text == "秒" || unit.Text == "毫秒"))
             {
-                unit.Left = halfW - 20;
-                unit.Width = 30;
+                unit.Left = halfW - 28;
+                unit.Width = 24;
                 unit.TextAlign = ContentAlignment.MiddleLeft;
             }
             else if (c is ComboBox)
@@ -310,10 +309,11 @@ public class MainForm : Form
             }
         }
 
-        // AC/DC column headers — positioned right after mode labels, proportional to panel width
-        int acLeft = 81;                    // label (8+65=73) + 8px gap
-        int comboW = Math.Max(55, (halfW - 93) / 2);
-        if (comboW > 80) comboW = 80;
+        // AC/DC column headers — scale with panel width, right after mode labels
+        int modeSectionLeft = halfW > 160 ? 81 : halfW - 79;
+        int comboW = Math.Max(50, (halfW - modeSectionLeft - 16) / 2);
+        if (comboW > 90) comboW = 90;
+        int acLeft = modeSectionLeft;
         int dcLeft = acLeft + comboW + 6;
 
         foreach (Control c in grpSettings.Controls)
