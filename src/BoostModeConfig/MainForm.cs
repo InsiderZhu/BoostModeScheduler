@@ -133,6 +133,14 @@ public class MainForm : Form
         numPollInterval = new NumericUpDown { Top = 140, Width = 65, Minimum = 500, Maximum = 30000, Increment = 500, Value = _config.PollIntervalMs };
         grpSettings.Controls.Add(numPollInterval);
 
+        // AC/DC column headers
+        new Label { Text = "AC", Width = 60, Height = 18, Font = new Font(Font, FontStyle.Underline), TextAlign = ContentAlignment.MiddleCenter }.Let(l => grpSettings.Controls.Add(l));
+        new Label { Text = "DC", Width = 60, Height = 18, Font = new Font(Font, FontStyle.Underline), TextAlign = ContentAlignment.MiddleCenter }.Let(l => grpSettings.Controls.Add(l));
+
+        // Mode labels (narrow width to avoid combo overlap)
+        grpSettings.Controls.Add(new Label { Text = "空闲模式:", Left = 8, Top = 192, Width = 65, Height = 18, TextAlign = ContentAlignment.MiddleRight });
+        grpSettings.Controls.Add(new Label { Text = "负载模式:", Left = 8, Top = 218, Width = 65, Height = 18, TextAlign = ContentAlignment.MiddleRight });
+
         // AC/DC mode selectors
         cmbIdleModeAc = CreateModeCombo(_config.IdleModeValueAc, 60);
         grpSettings.Controls.Add(cmbIdleModeAc);
@@ -278,24 +286,24 @@ public class MainForm : Form
             }
         }
 
-        // Mode label "AC"/"DC" column headers
-        int acLeft = halfW - 120;
-        int dcLeft = halfW - 50;
-        int comboW = Math.Max(50, (halfW - 160) / 2);
-        if (comboW > 90) comboW = 90;
+        // AC/DC column headers — positioned right after mode labels, proportional to panel width
+        int acLeft = 81;                    // label (8+65=73) + 8px gap
+        int comboW = Math.Max(55, (halfW - 93) / 2);
+        if (comboW > 80) comboW = 80;
+        int dcLeft = acLeft + comboW + 6;
 
         foreach (Control c in grpSettings.Controls)
         {
-            if (c is Label lbl && (lbl.Top == 170 || lbl.Top == 170))
+            if (c is Label lbl && lbl.Font.Underline && (lbl.Text == "AC" || lbl.Text == "DC"))
             {
-                if (lbl.Text == "AC" && lbl.Font.Underline)
-                { c.Left = acLeft; c.Width = 25; }
-                if (lbl.Text == "DC" && lbl.Font.Underline)
-                { c.Left = dcLeft; c.Width = 25; }
+                lbl.Left = lbl.Text == "AC" ? acLeft : dcLeft;
+                lbl.Top = 168;
+                lbl.Width = comboW;
+                lbl.TextAlign = ContentAlignment.MiddleCenter;
             }
         }
 
-        // Reposition the 4 combos
+        // Reposition the 4 combos — aligned with their headers
         cmbIdleModeAc.Left = acLeft; cmbIdleModeAc.Top = 190; cmbIdleModeAc.Width = comboW;
         cmbIdleModeDc.Left = dcLeft; cmbIdleModeDc.Top = 190; cmbIdleModeDc.Width = comboW;
         cmbLoadModeAc.Left = acLeft; cmbLoadModeAc.Top = 216; cmbLoadModeAc.Width = comboW;
