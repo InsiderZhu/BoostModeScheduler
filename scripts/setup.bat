@@ -2,12 +2,12 @@
 chcp 65001 >nul 2>&1
 title BoostModeScheduler - 一键安装
 
-:: === 检查管理员权限，非管理员则自动提权 ===
+:: === 自动提权 ===
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo 正在请求管理员权限，请在弹出的 UAC 窗口中点击"是"...
-    timeout /t 1 >nul
-    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    timeout /t 2 >nul
+    powershell -Command "Start-Process '%~f0' -Verb RunAs -Wait"
     exit /b
 )
 
@@ -18,6 +18,14 @@ echo.
 
 :: 定位到脚本所在目录
 cd /d "%~dp0"
+
+:: 检查必要文件
+if not exist "%~dp0BoostModeService.exe" (
+    echo [错误] 未找到 BoostModeService.exe
+    echo 请确认 setup.bat 和所有 exe 在同一目录
+    pause
+    exit /b 1
+)
 
 set "SVC_NAME=BoostModeSvc"
 set "CFG_DIR=%ProgramData%\BoostModeSvc"
@@ -59,8 +67,10 @@ echo ============================================
 echo.
 
 :: 启动配置工具
-echo 正在打开配置工具...
-start "" "%~dp0BoostModeConfig.exe"
+if exist "%~dp0BoostModeConfig.exe" (
+    echo 正在打开配置工具...
+    start "" "%~dp0BoostModeConfig.exe"
+)
 
 echo 按任意键退出...
 pause >nul
