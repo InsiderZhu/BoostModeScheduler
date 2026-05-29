@@ -29,7 +29,6 @@ public class MainForm : Form
     private Button btnApplyManual = null!;
     private Button btnSave = null!, btnRefresh = null!;
     private Button btnEditConfig = null!, btnOpenLogFolder = null!, btnViewLog = null!;
-    private CheckBox chkAutoStart = null!, chkCloseToTray = null!, chkEnableNotify = null!;
     private NotifyIcon trayIcon = null!;
     private bool _realClosing;
     private DateTime _lastNotifiedSwitch = DateTime.MinValue;
@@ -110,7 +109,7 @@ public class MainForm : Form
         int y = 12;
 
         // ─── Service Control ───
-        grpService = new GroupBox { Text = "服务控制", Top = y, Height = 118 };
+        grpService = new GroupBox { Text = "服务控制", Top = y, Height = 70 };
         lblServiceStatus = new Label { Text = "状态: 检测中...", Left = 12, Top = 22, Width = 300, Height = 20 };
         lblServiceStatus.Font = new Font(lblServiceStatus.Font, FontStyle.Bold);
         grpService.Controls.Add(lblServiceStatus);
@@ -127,34 +126,12 @@ public class MainForm : Form
         btnRestart.Click += (_, _) => ControlService("restart");
         grpService.Controls.Add(btnRestart);
 
-        chkAutoStart = new CheckBox { Text = "开机自启", Left = 12, Top = 52, Width = 120, Height = 22 };
-        chkAutoStart.CheckedChanged += (_, _) =>
-        {
-            try { SetServiceAutoStart(chkAutoStart.Checked); }
-            catch (Exception ex) { ShowError($"设置失败: {ex.Message}"); chkAutoStart.Checked = !chkAutoStart.Checked; }
-        };
-        grpService.Controls.Add(chkAutoStart);
-
-        chkCloseToTray = new CheckBox { Text = "关闭时最小化到托盘", Left = 140, Top = 52, Width = 180, Height = 22 };
-        chkCloseToTray.Checked = _config.CloseToTray;
-        chkCloseToTray.CheckedChanged += (_, _) =>
-        {
-            _config.CloseToTray = chkCloseToTray.Checked;
-            ConfigManager.Save(_config);
-        };
-        grpService.Controls.Add(chkCloseToTray);
-
-        chkEnableNotify = new CheckBox { Text = "模式切换时显示通知", Left = 12, Top = 78, Width = 180, Height = 22 };
-        chkEnableNotify.Checked = _config.EnableSwitchNotification;
-        chkEnableNotify.CheckedChanged += (_, _) =>
-        {
-            _config.EnableSwitchNotification = chkEnableNotify.Checked;
-            ConfigManager.Save(_config);
-        };
-        grpService.Controls.Add(chkEnableNotify);
+        var btnSettings = new Button { Text = "设置", Top = 18, Width = 60, Height = 28 };
+        btnSettings.Click += (_, _) => ShowSettingsDialog();
+        grpService.Controls.Add(btnSettings);
 
         Controls.Add(grpService);
-        y += 128;
+        y += 80;
 
         // ─── Current Status ───
         grpStatus = new GroupBox { Text = "当前状态", Top = y, Height = 110 };
@@ -409,14 +386,14 @@ public class MainForm : Form
         btnRemove.Width = ww - 16;
 
         // ── Service buttons ──
-        btnStart.Left = w - 320;
-        btnStop.Left = w - 244;
-        btnRestart.Left = w - 168;
-
-        // ── Service checkboxes ──
-        chkAutoStart.Left = 12;
-        chkCloseToTray.Left = Math.Max(130, w - 280);
-        chkEnableNotify.Left = Math.Max(300, w - 80);
+        btnStart.Left = w - 340;
+        btnStop.Left = w - 264;
+        btnRestart.Left = w - 188;
+        foreach (Control c in grpService.Controls)
+        {
+            if (c is Button btn && btn.Text == "设置")
+                btn.Left = w - 106;
+        }
 
         // ── lblCpuUsage ──
         lblCpuUsage.Left = w - 360;
@@ -514,15 +491,6 @@ public class MainForm : Form
             lblServiceStatus.ForeColor = status == ServiceControllerStatus.Running ? Color.Green : Color.Red;
             btnStart.Enabled = status != ServiceControllerStatus.Running;
             btnStop.Enabled = status == ServiceControllerStatus.Running;
-
-            bool autoStart = IsServiceAutoStart();
-            chkAutoStart.CheckedChanged -= (_, _) => { };
-            chkAutoStart.Checked = autoStart;
-            chkAutoStart.CheckedChanged += (_, _) =>
-            {
-                try { SetServiceAutoStart(chkAutoStart.Checked); }
-                catch (Exception ex) { ShowError($"设置失败: {ex.Message}"); chkAutoStart.Checked = !chkAutoStart.Checked; }
-            };
         }
         catch (InvalidOperationException)
         {
@@ -905,6 +873,58 @@ public class MainForm : Form
         viewer.Controls.Add(closeBtn);
 
         viewer.ShowDialog();
+    }
+
+    private void ShowSettingsDialog()
+    {
+        var form = new Form
+        {
+            Text = "设置",
+            Size = new Size(340, 200),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false
+        };
+
+        int y = 16;
+
+        var chkAuto = new CheckBox { Text = "开机自启", Left = 20, Top = y, Width = 280, Height = 24 };
+        chkAuto.Checked = IsServiceAutoStart();
+        chkAuto.CheckedChanged += (_, _) =>
+        {
+            try { SetServiceAutoStart(chkAuto.Checked); }
+            catch { chkAuto.Checked = !chkAuto.Checked; }
+        };
+        form.Controls.Add(chkAuto);
+        y += 30;
+
+        var chkTray = new CheckBox { Text = "关闭窗口时最小化到托盘", Left = 20, Top = y, Width = 280, Height = 24 };
+        chkTray.Checked = _config.CloseToTray;
+        chkTray.CheckedChanged += (_, _) =>
+        {
+            _config.CloseToTray = chkTray.Checked;
+            ConfigManager.Save(_config);
+        };
+        form.Controls.Add(chkTray);
+        y += 30;
+
+        var chkNotify = new CheckBox { Text = "模式切换时显示系统通知", Left = 20, Top = y, Width = 280, Height = 24 };
+        chkNotify.Checked = _config.EnableSwitchNotification;
+        chkNotify.CheckedChanged += (_, _) =>
+        {
+            _config.EnableSwitchNotification = chkNotify.Checked;
+            ConfigManager.Save(_config);
+        };
+        form.Controls.Add(chkNotify);
+        y += 40;
+
+        var btnClose = new Button { Text = "关闭", Left = 120, Top = y, Width = 80, Height = 30 };
+        btnClose.Click += (_, _) => form.Close();
+        form.Controls.Add(btnClose);
+
+        form.ShowDialog();
     }
 
     private void ShowError(string message)
